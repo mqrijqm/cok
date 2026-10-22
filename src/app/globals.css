@@ -1,26 +1,275 @@
 @import "tailwindcss";
 
+/* ─────────────────────────────────────────────
+   AVORIO — palette
+   White chocolate (ivory/cream) + cocoa from the
+   painting backgrounds + vermilion, the red pigment
+   of the Renaissance, as the single accent.
+   ───────────────────────────────────────────── */
+@theme {
+  --color-cocoa-950: #140f0b;
+  --color-cocoa-900: #1d1611;
+  --color-cocoa-850: #251c16;
+  --color-cocoa-800: #2b2019;
+  --color-cocoa-700: #4a3a2e;
+  --color-cocoa-500: #7d6a58;
+
+  --color-ivory-50: #faf6ee;
+  --color-ivory-100: #f3ecdf;
+  --color-ivory-200: #e9dfcc;
+  --color-ivory-300: #ddcfb5;
+  --color-ivory-400: #c4b293;
+  --color-ivory-500: #a39072;
+
+  --color-vermilion: #b5361c;
+  --color-vermilion-soft: #c9482b;
+  --color-gold: #b8955a;
+
+  --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-sans: var(--font-figtree), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --radius-ui: 10px;
+  --radius-card: 24px;
+
+  --ease-spring: cubic-bezier(0.34, 2.27, 0.64, 1);
+  --ease-click: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --gutter: 16px;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@media (min-width: 640px) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --gutter: 24px;
   }
 }
 
+@media (min-width: 1024px) {
+  :root {
+    --gutter: 40px;
+  }
+}
+
+html {
+  background: var(--color-cocoa-950);
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-cocoa-950);
+  color: var(--color-ivory-100);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: clip;
+}
+
+::selection {
+  background: var(--color-vermilion);
+  color: var(--color-ivory-50);
+}
+
+/* Lenis */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+/* ─── Type ─── */
+.display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  text-transform: uppercase;
+  letter-spacing: -0.06em;
+  line-height: 0.84;
+}
+
+.label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+/* Masked line reveal: wrapper clips, inner slides up */
+.line-mask {
+  display: block;
+  overflow: clip;
+  padding-bottom: 0.06em;
+  margin-bottom: -0.06em;
+}
+.line-mask > * {
+  display: block;
+  will-change: transform;
+}
+
+/* Typewriter caret — absolutely placed so it never reflows the text */
+.type-on-scroll [data-c] {
+  position: relative;
+}
+.type-on-scroll .is-caret::after {
+  content: "";
+  position: absolute;
+  left: 100%;
+  animation: caret 1s steps(1) infinite;
+}
+.caret-bar .is-caret::after {
+  top: 0.12em;
+  width: 0.06em;
+  min-width: 2px;
+  height: 0.88em;
+  margin-left: 0.04em;
+  background: currentColor;
+}
+.caret-block .is-caret::after {
+  top: 0.04em;
+  width: 0.5em;
+  height: 0.78em;
+  margin-left: 0.06em;
+  background: var(--color-vermilion);
+}
+
+/* ─── Buttons (springy scale + glow, like the reference) ─── */
+.btn {
+  --btn-bg: var(--color-vermilion);
+  --btn-fg: var(--color-ivory-50);
+  --btn-border: transparent;
+  --btn-shadow: 0 0 45px rgb(181 54 28 / 0.38);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4em;
+  padding: 1em 1.2em;
+  border-radius: var(--radius-ui);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  font-weight: 650;
+  line-height: 1;
+  color: var(--btn-fg);
+  white-space: nowrap;
+  isolation: isolate;
+  cursor: pointer;
+}
+.btn::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  border-radius: inherit;
+  background: var(--btn-bg);
+  border: 1px solid var(--btn-border);
+  box-shadow: var(--btn-shadow);
+  transition: scale 0.5s var(--ease-spring);
+}
+.btn:hover::before {
+  scale: 1.065 1.095;
+}
+.btn:active::before {
+  scale: 0.955 0.925;
+  transition: scale 0.15s var(--ease-click);
+}
+.btn:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 4px;
+}
+.btn-ghost {
+  --btn-bg: transparent;
+  --btn-fg: currentColor;
+  --btn-border: color-mix(in srgb, currentColor 35%, transparent);
+  --btn-shadow: none;
+}
+.btn-sm {
+  font-size: 13px;
+  padding: 0.85em 1em;
+}
+
+/* Ivory "chip" for tags */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.45em 0.8em;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border: 1px solid color-mix(in srgb, currentColor 40%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0.55em 0.95em;
+  background: var(--color-vermilion);
+  color: var(--color-ivory-50);
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  line-height: 1;
+}
+
+/* Underline link that draws on hover */
+.link-draw {
+  background: linear-gradient(currentColor, currentColor) 0 100% / 100% 1px no-repeat;
+  transition: background-size 0.5s var(--ease-out-expo);
+}
+.link-draw:hover {
+  background-size: 0% 1px;
+  background-position: 100% 100%;
+}
+
+/* Film grain over everything — paintings deserve texture */
+.grain {
+  pointer-events: none;
+  position: fixed;
+  inset: -50%;
+  z-index: 90;
+  opacity: 0.075;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5  0 0 0 0 0.45  0 0 0 0 0.4  0 0 0 1.1 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  animation: grain 0.9s steps(6) infinite;
+}
+@keyframes grain {
+  0% { transform: translate(0, 0); }
+  20% { transform: translate(-4%, 3%); }
+  40% { transform: translate(3%, -5%); }
+  60% { transform: translate(-6%, -2%); }
+  80% { transform: translate(5%, 4%); }
+  100% { transform: translate(0, 0); }
+}
+
+@keyframes marquee {
+  to { transform: translate3d(-50%, 0, 0); }
+}
+
+@keyframes spin-slow {
+  to { rotate: 360deg; }
+}
+
+@keyframes caret {
+  50% { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
