@@ -4,7 +4,7 @@ import { useRef } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
-import { useLenis } from "lenis/react";
+import TLink from "./TLink";
 import { CONTACT, FOOTER, NAV } from "@/lib/content";
 import { prefersReducedMotion } from "@/lib/motion";
 
@@ -12,7 +12,6 @@ gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 export default function Footer() {
   const root = useRef<HTMLElement>(null);
-  const lenis = useLenis();
 
   useGSAP(
     () => {
@@ -26,15 +25,7 @@ export default function Footer() {
       gsap.fromTo(
         ".ft-letter",
         { rotateX: -100, yPercent: 50, opacity: 0, transformOrigin: "50% 100%" },
-        {
-          rotateX: 0,
-          yPercent: 0,
-          opacity: 1,
-          ease: "expo.out",
-          duration: 1.4,
-          stagger: 0.06,
-          scrollTrigger: { trigger: ".ft-wordmark", start: "top 95%", once: true },
-        }
+        { rotateX: 0, yPercent: 0, opacity: 1, ease: "expo.out", duration: 1.4, stagger: 0.06, scrollTrigger: { trigger: ".ft-wordmark", start: "top 95%", once: true } }
       );
       gsap.fromTo(
         ".ft-taste",
@@ -44,11 +35,6 @@ export default function Footer() {
     },
     { scope: root }
   );
-
-  const go = (id: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    lenis?.scrollTo(id, { duration: 1.8 });
-  };
 
   return (
     <footer ref={root} id="contatto" data-nav="dark" className="relative z-10 overflow-hidden bg-beige">
@@ -64,9 +50,9 @@ export default function Footer() {
           </h2>
           <p className="mx-auto mt-8 max-w-[440px] text-[14px] leading-[1.6]">{FOOTER.body}</p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
-            <a href={`mailto:${CONTACT.email}?subject=Tasting`} className="btn font-bold">
+            <TLink href="/contatto" label="Scrivici" className="btn">
               {FOOTER.cta} <span aria-hidden>→</span>
-            </a>
+            </TLink>
             <a href={`mailto:${CONTACT.email}`} className="btn btn-ghost btn-sm text-beige">
               {CONTACT.email}
             </a>
@@ -74,11 +60,11 @@ export default function Footer() {
         </div>
 
         <ul className="label mt-auto flex flex-wrap justify-center gap-x-8 gap-y-3 pt-20">
-          {NAV.map((n) => (
+          {[...NAV, { label: "Contatto", href: "/contatto" }].map((n) => (
             <li key={n.label}>
-              <a href={n.href} onClick={go(n.href)} className="link-under">
+              <TLink href={n.href} label={n.label} className="link-under">
                 {n.label}
-              </a>
+              </TLink>
             </li>
           ))}
           <li>
@@ -103,14 +89,7 @@ export default function Footer() {
 
         <div className="label mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
           <span>© 2026 Avorio · Firenze</span>
-          <span className="flex gap-6">
-            <a href="#" className="link-under">
-              Privacy
-            </a>
-            <a href="#" className="link-under">
-              Terms
-            </a>
-          </span>
+          <span>Paintings reimagined after the Renaissance masters</span>
         </div>
       </div>
     </footer>

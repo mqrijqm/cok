@@ -25,9 +25,20 @@ pnpm dev
 | Making-of illustrations (pod → bar) | `src/components/three/MakingScene.tsx` |
 | Shared chocolate shapes | `src/components/three/chocolate.tsx` |
 
-Sections, top to bottom: `Preloader` → `Hero` → `Story` (the text section,
-one colour per line) → `FlipTransition` → `MakingOf` (pinned, seven acts) →
-`Collection` (3D ring) → `Footer`. `FlyingLayer` sits over hero, story and footer.
+## Pages
+
+| Route | What |
+|---|---|
+| `/` | Home: hero, story, making-of, collection ring |
+| `/collezione` | All five editions, painting follows the cursor |
+| `/collezione/[slug]` | One page per edition (`src/lib/editions.ts`) |
+| `/atelier` | Workshop, manifesto, people, opening hours |
+| `/journal`, `/journal/[slug]` | Long-form notes (`src/lib/journal.ts`) |
+| `/regali` | Gifts, subscription, FAQ |
+| `/contatto` | Contact and tasting request (opens the visitor's mail app) |
+
+Page changes run through a two-colour curtain (`src/components/Curtain.tsx`);
+links use `TLink` so the curtain drops before navigating.
 
 ## Before launch
 

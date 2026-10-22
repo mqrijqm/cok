@@ -25,6 +25,11 @@ export default function Preloader() {
 
   useGSAP(
     () => {
+      // Coming back to the home page from another page: no second preloader.
+      if (window.__avorioIntroDone) {
+        gsap.set(root.current, { display: "none" });
+        return;
+      }
       window.scrollTo(0, 0);
 
       const progress = { v: 0 };
@@ -70,7 +75,7 @@ export default function Preloader() {
   );
 
   return (
-    <div ref={root} className="fixed inset-0 z-[95] text-beige" aria-hidden>
+    <div ref={root} data-preloader className="fixed inset-0 z-[95] text-beige" aria-hidden>
       <div className="pl-panel absolute inset-0 bg-magenta" style={{ clipPath: "inset(0 0 0% 0)" }} />
       <div className="pl-panel absolute inset-0 bg-beige" style={{ clipPath: "inset(0 0 0% 0)" }} />
       <div className="pl-panel absolute inset-0 grid place-items-center bg-magenta" style={{ clipPath: "inset(0 0 0% 0)" }}>

@@ -3,6 +3,9 @@ import { Instrument_Serif, Space_Grotesk } from "next/font/google";
 import localFont from "next/font/local";
 import SmoothScroll from "@/components/SmoothScroll";
 import Cursor from "@/components/Cursor";
+import Nav from "@/components/Nav";
+import Curtain from "@/components/Curtain";
+import Duotone from "@/components/Duotone";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -29,7 +32,8 @@ const pragmatica = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "Avorio — Hand-tempered white chocolate",
+  metadataBase: new URL("https://avorio-kappa.vercel.app"),
+  title: { default: "Avorio — Hand-tempered white chocolate", template: "%s — Avorio" },
   description:
     "White chocolate made only from the butter of the cacao bean, Bourbon vanilla and slow milk. Tempered by hand in Firenze.",
 };
@@ -42,8 +46,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${spaceGrotesk.variable} ${instrumentSerif.variable} ${pragmatica.variable} antialiased`}>
       <body>
-        <SmoothScroll>{children}</SmoothScroll>
+        <SmoothScroll>
+          <Nav />
+          {children}
+          <Curtain />
+        </SmoothScroll>
         <Cursor />
+        <Duotone />
       </body>
     </html>
   );

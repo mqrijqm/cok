@@ -42,6 +42,11 @@ body {
   background: var(--color-magenta);
 }
 
+/* Belt and braces: nothing may widen the page sideways on phones. */
+html {
+  overflow-x: clip;
+}
+
 body {
   color: var(--color-beige);
   font-family: var(--font-sans);
@@ -67,6 +72,8 @@ html.lenis body {
   overflow: clip;
 }
 
+/* Component classes live in a layer so Tailwind utilities can override them. */
+@layer components {
 /* ─── Type ─── */
 .display {
   font-family: var(--font-display);
@@ -160,6 +167,7 @@ html.lenis body {
   font-size: 12px;
   padding: 0.95em 1.05em;
 }
+}
 
 /* 3D stage helpers */
 .p3d {
@@ -198,6 +206,7 @@ html.lenis body {
   }
 }
 
+@layer components {
 /* Solid underline that draws in on hover */
 .link-under {
   background: linear-gradient(currentColor, currentColor) 0 100% / 0% 1.5px no-repeat;
@@ -205,4 +214,5 @@ html.lenis body {
 }
 .link-under:hover {
   background-size: 100% 1.5px;
+}
 }

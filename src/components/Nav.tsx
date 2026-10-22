@@ -1,24 +1,41 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import gsap from "gsap";
 import { useLenis } from "lenis/react";
 import Logo from "./Logo";
+import TLink from "./TLink";
 import { NAV } from "@/lib/content";
 
 type Theme = "dark" | "light";
+
+function themeUnderNav(): Theme | undefined {
+  const el = document.elementsFromPoint(window.innerWidth / 2, 36).find((n) => (n as HTMLElement).closest?.("[data-nav]"));
+  return (el as HTMLElement | undefined)?.closest<HTMLElement>("[data-nav]")?.dataset.nav as Theme | undefined;
+}
 
 export default function Nav() {
   const [scrolled, setScrolled] = useState(false);
   const [theme, setTheme] = useState<Theme>("dark");
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
   const lenis = useLenis(({ scroll }) => {
     setScrolled(scroll > 40);
-    const el = document.elementsFromPoint(window.innerWidth / 2, 36).find((n) => (n as HTMLElement).closest?.("[data-nav]"));
-    const t = (el as HTMLElement | undefined)?.closest<HTMLElement>("[data-nav]")?.dataset.nav as Theme | undefined;
+    const t = themeUnderNav();
     if (t) setTheme(t);
   });
+
+  // A new page starts at the top with its own colours.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      setScrolled(window.scrollY > 40);
+      const t = themeUnderNav();
+      if (t) setTheme(t);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [pathname]);
 
   const wasOpen = useRef(false);
   useEffect(() => {
@@ -43,12 +60,7 @@ export default function Nav() {
     }
   }, [open, lenis]);
 
-  const go = (id: string) => (e: React.MouseEvent) => {
-    e.preventDefault();
-    setOpen(false);
-    lenis?.scrollTo(id, { duration: 1.8 });
-  };
-
+  const close = () => setOpen(false);
   const light = theme === "light" && scrolled;
 
   return (
@@ -58,27 +70,32 @@ export default function Nav() {
           className={`mx-auto flex items-center justify-between rounded-[14px] border-[1.5px] transition-[height,padding,background-color,color,border-color] duration-500 ease-[var(--ease-out-expo)] ${
             scrolled
               ? `h-[52px] px-3 pl-4 ${light ? "border-magenta bg-beige text-magenta" : "border-beige bg-magenta text-beige"}`
-              : "h-[80px] border-transparent bg-transparent px-0 text-beige"
+              : `h-[80px] border-transparent bg-transparent px-0 ${theme === "light" ? "text-magenta" : "text-beige"}`
           }`}
         >
-          <a href="#top" onClick={go("#top")} className={`transition-[font-size] duration-700 ${scrolled ? "text-[15px]" : "text-[19px]"}`}>
+          <TLink href="/" label="Avorio" onClick={close} className={`transition-[font-size] duration-700 ${scrolled ? "text-[15px]" : "text-[19px]"}`}>
             <Logo />
-          </a>
+          </TLink>
 
-          <ul className={`absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex ${scrolled ? "text-[13px]" : "text-[15px]"} font-medium transition-[font-size] duration-700`}>
+          <ul className={`absolute left-1/2 hidden -translate-x-1/2 items-center lg:flex ${scrolled ? "text-[13px]" : "text-[14px]"} transition-[font-size] duration-700`}>
             {NAV.map((item) => (
               <li key={item.label}>
-                <a href={item.href} onClick={go(item.href)} className="link-under mx-3.5 block py-2">
+                <TLink
+                  href={item.href}
+                  label={item.label}
+                  aria-current={pathname !== "/" && item.href.startsWith(pathname) ? "page" : undefined}
+                  className="link-under mx-3.5 block py-2 aria-[current=page]:[background-size:100%_1.5px]"
+                >
                   {item.label}
-                </a>
+                </TLink>
               </li>
             ))}
           </ul>
 
           <div className="flex items-center gap-3">
-            <a href="#contatto" onClick={go("#contatto")} className={`btn ${light ? "btn-dark" : ""} ${scrolled ? "btn-sm" : ""}`}>
+            <TLink href="/regali" label="Regali" onClick={close} className={`btn ${light || (!scrolled && theme === "light") ? "btn-dark" : ""} ${scrolled ? "btn-sm" : ""}`}>
               Order
-            </a>
+            </TLink>
             <button
               type="button"
               aria-label={open ? "Close menu" : "Open menu"}
@@ -102,11 +119,11 @@ export default function Nav() {
         style={{ clipPath: "inset(0 0 100% 0)" }}
       >
         <ul className="flex flex-col gap-1">
-          {NAV.map((item) => (
+          {[...NAV, { label: "Contatto", href: "/contatto" }].map((item) => (
             <li key={item.label} className="line-mask">
-              <a href={item.href} onClick={go(item.href)} className="mm-link display block origin-bottom text-[15vw] text-beige">
+              <TLink href={item.href} label={item.label} onClick={close} className="mm-link display block origin-bottom text-[13.5vw] text-beige">
                 {item.label}
-              </a>
+              </TLink>
             </li>
           ))}
         </ul>

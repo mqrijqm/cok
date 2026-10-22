@@ -14,9 +14,11 @@ export const CONTACT = {
 };
 
 export const NAV = [
-  { label: "Il Cioccolato", href: "#story" },
-  { label: "Making of", href: "#making" },
-  { label: "Collezione", href: "#collezione" },
+  { label: "Collezione", href: "/collezione" },
+  { label: "Atelier", href: "/atelier" },
+  { label: "Making of", href: "/#making" },
+  { label: "Journal", href: "/journal" },
+  { label: "Regali", href: "/regali" },
 ] as const;
 
 export const HERO = {
@@ -55,6 +57,7 @@ export const MAKING = [
 ];
 
 export type Edition = {
+  slug: string;
   name: string;
   meta: string;
   notes: string;
@@ -63,11 +66,11 @@ export type Edition = {
 };
 
 export const EDITIONS: Edition[] = [
-  { name: "La Dama", meta: "N°01", notes: "Bourbon vanilla & cream", image: "laDama", focus: "50% 40%" },
-  { name: "La Devota", meta: "N°02", notes: "Rose & Cervia salt", image: "laDevota", focus: "45% 45%" },
-  { name: "Ofelia", meta: "N°03", notes: "Elderflower & acacia honey", image: "ofelia", focus: "50% 55%" },
-  { name: "La Tentazione", meta: "N°04", notes: "Caramelised milk & smoked salt", image: "laTentazione", focus: "50% 50%" },
-  { name: "La Maddalena", meta: "N°05", notes: "Pistacchio di Bronte", image: "laMaddalena", focus: "50% 35%" },
+  { slug: "la-dama", name: "La Dama", meta: "N°01", notes: "Bourbon vanilla & cream", image: "laDama", focus: "50% 40%" },
+  { slug: "la-devota", name: "La Devota", meta: "N°02", notes: "Rose & Cervia salt", image: "laDevota", focus: "45% 45%" },
+  { slug: "ofelia", name: "Ofelia", meta: "N°03", notes: "Elderflower & acacia honey", image: "ofelia", focus: "50% 55%" },
+  { slug: "la-tentazione", name: "La Tentazione", meta: "N°04", notes: "Caramelised milk & smoked salt", image: "laTentazione", focus: "50% 50%" },
+  { slug: "la-maddalena", name: "La Maddalena", meta: "N°05", notes: "Pistacchio di Bronte", image: "laMaddalena", focus: "50% 35%" },
 ];
 
 export const FOOTER = {
@@ -76,4 +79,63 @@ export const FOOTER = {
   body: "Half an hour in the atelier to taste all five editions. We pour, you decide.",
   cta: "Book a tasting",
   wordmark: "Avorio",
+};
+
+export const ATELIER = {
+  kicker: "La bottega",
+  serif: "in Oltrarno",
+  title: ["Atelier"],
+  intro: "A small room across the river from the Duomo, a slab of Carrara marble and two pairs of hands. Everything we make starts and ends here.",
+  manifesto: [
+    { text: "Five ingredients. *Never* six.", bg: B, fg: M },
+    { text: "Seventy-two hours of *patience* before every cut.", bg: M, fg: B },
+    { text: "Paper, foil, wax. *No* plastic.", bg: B, fg: M },
+    { text: "Two pairs of *hands*, and that is all.", bg: M, fg: B },
+  ],
+  people: [
+    { name: "Caterina", role: "Maestra cioccolatiera", image: "laMaddalena" as const, focus: "50% 20%", line: "Tempers every batch by hand and tastes every one of them." },
+    { name: "Beatrice", role: "Wrapping & letters", image: "laDevota" as const, focus: "42% 28%", line: "Folds the foil, seals the wax, answers your notes." },
+  ],
+  bottega: { title: "Join the bottega", line: "We take one apprentice a year. Send us something you made, not a cover letter." },
+  visit: {
+    title: ["Come and", "taste"],
+    hours: [
+      ["Tuesday – Friday", "10:00 – 19:00"],
+      ["Saturday", "10:00 – 17:00"],
+      ["Sunday & Monday", "Closed"],
+    ],
+    line: "Tastings of the full collection by appointment, thirty minutes, up to four people.",
+  },
+};
+
+export const REGALI = {
+  kicker: "Regali & abbonamento",
+  serif: "for someone",
+  title: ["Regali"],
+  intro: "Every bar leaves the atelier wrapped by hand, sealed in wax and sent with a card written in ink.",
+  offers: [
+    { name: "Una tavoletta", line: "A single edition, wrapped and sealed, with a handwritten card.", price: "from €14", cta: "Choose an edition", href: "/collezione" },
+    { name: "La collezione", line: "All five portraits in a linen gallery box, with a numbered certificate.", price: "€68", cta: "Order the box", href: "/contatto" },
+    { name: "Abbonamento", line: "New editions at your door every month. Piccola: four bars for €39. Grande: twelve for €96.", price: "from €39 / month", cta: "Subscribe", href: "/contatto" },
+  ],
+  occasions: {
+    title: ["Weddings,", "hotels, brands"],
+    line: "Favours with your names lettered in gold, turndown squares in your colours, a portrait sleeve painted for your event. From fifty boxes.",
+    cta: "Ask for a proposal",
+  },
+  shipping: ["Wrapped by hand", "Sent within three days", "Cool-packed in summer"],
+  faq: [
+    { q: "How should I store the chocolate?", a: "Somewhere cool, dry and dark, ideally between 16 and 18°C and away from strong smells. Please keep it out of the fridge: condensation leaves a white film on the surface." },
+    { q: "How long does it keep?", a: "Each bar is best within nine months of the date on its sleeve, and best of all in the first three." },
+    { q: "What about allergens?", a: "Every edition contains milk. La Maddalena also contains pistachio. All bars are made in a kitchen that handles nuts." },
+    { q: "Where do you ship?", a: "Across the European Union. In the warmest months we ship early in the week with cool packs, so nothing waits in a depot over the weekend." },
+    { q: "Can I pause or cancel a subscription?", a: "Yes, any month, from your account or with a short email. There are no fees and no minimum term." },
+  ],
+};
+
+export const CONTATTO = {
+  kicker: "Contatto",
+  serif: "or come and taste",
+  title: ["Scrivici"],
+  intro: "Write to book a tasting, order a box for an occasion, or simply to tell us which square you liked best.",
 };
