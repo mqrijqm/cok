@@ -47,3 +47,6 @@ playwright/.auth/
 
 # original image exports (copied into src/assets)
 _source/
+
+.vercel
+.env*
