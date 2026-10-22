@@ -2,30 +2,31 @@
 
 /* ─────────────────────────────────────────────
    AVORIO — palette
-   White chocolate (ivory/cream) + cocoa from the
-   painting backgrounds + vermilion, the red pigment
-   of the Renaissance, as the single accent.
+   Pantone 4975 C "Vintage Wine" as the royal dark,
+   bordeaux → raspberry → dusty rose as the colour
+   journey, and white-chocolate ivory as the light.
    ───────────────────────────────────────────── */
 @theme {
-  --color-cocoa-950: #140f0b;
-  --color-cocoa-900: #1d1611;
-  --color-cocoa-850: #251c16;
-  --color-cocoa-800: #2b2019;
-  --color-cocoa-700: #4a3a2e;
-  --color-cocoa-500: #7d6a58;
+  --color-wine-950: #1f0a10;
+  --color-wine-900: #3f1521;
+  --color-wine-800: #561c2d;
+  --color-wine-700: #6e2337;
+  --color-wine-500: #a23b5a;
+  --color-rose-400: #d1849a;
+  --color-rose-300: #e3a7b6;
+  --color-rose-100: #f5dce1;
 
   --color-ivory-50: #faf6ee;
-  --color-ivory-100: #f3ecdf;
-  --color-ivory-200: #e9dfcc;
+  --color-ivory-100: #f4ecde;
+  --color-ivory-200: #eadfcb;
   --color-ivory-300: #ddcfb5;
   --color-ivory-400: #c4b293;
   --color-ivory-500: #a39072;
 
-  --color-vermilion: #b5361c;
-  --color-vermilion-soft: #c9482b;
-  --color-gold: #b8955a;
+  --color-gold: #c9a46a;
 
   --font-display: var(--font-space-grotesk), system-ui, sans-serif;
+  --font-serif: var(--font-instrument-serif), Georgia, serif;
   --font-sans: var(--font-figtree), system-ui, sans-serif;
   --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
 
@@ -55,11 +56,11 @@
 }
 
 html {
-  background: var(--color-cocoa-950);
+  background: var(--color-wine-950);
 }
 
 body {
-  background: var(--color-cocoa-950);
+  background: var(--color-wine-900);
   color: var(--color-ivory-100);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
@@ -68,8 +69,8 @@ body {
 }
 
 ::selection {
-  background: var(--color-vermilion);
-  color: var(--color-ivory-50);
+  background: var(--color-rose-300);
+  color: var(--color-wine-900);
 }
 
 /* Lenis */
@@ -135,15 +136,15 @@ html.lenis body {
   width: 0.5em;
   height: 0.78em;
   margin-left: 0.06em;
-  background: var(--color-vermilion);
+  background: var(--color-rose-300);
 }
 
 /* ─── Buttons (springy scale + glow, like the reference) ─── */
 .btn {
-  --btn-bg: var(--color-vermilion);
-  --btn-fg: var(--color-ivory-50);
+  --btn-bg: var(--color-rose-300);
+  --btn-fg: var(--color-wine-900);
   --btn-border: transparent;
-  --btn-shadow: 0 0 45px rgb(181 54 28 / 0.38);
+  --btn-shadow: 0 0 50px rgb(227 167 182 / 0.45);
   position: relative;
   display: inline-flex;
   align-items: center;
@@ -188,6 +189,11 @@ html.lenis body {
   --btn-border: color-mix(in srgb, currentColor 35%, transparent);
   --btn-shadow: none;
 }
+.btn-dark {
+  --btn-bg: var(--color-wine-900);
+  --btn-fg: var(--color-ivory-50);
+  --btn-shadow: 0 0 45px rgb(63 21 33 / 0.35);
+}
 .btn-sm {
   font-size: 13px;
   padding: 0.85em 1em;
@@ -212,8 +218,8 @@ html.lenis body {
   align-items: center;
   border-radius: 999px;
   padding: 0.55em 0.95em;
-  background: var(--color-vermilion);
-  color: var(--color-ivory-50);
+  background: var(--color-rose-300);
+  color: var(--color-wine-900);
   font-family: var(--font-display);
   font-size: 11px;
   font-weight: 600;
@@ -271,5 +277,34 @@ html.lenis body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+.serif {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  text-transform: none;
+}
+
+/* 3D stage helpers */
+.p3d {
+  perspective: 1200px;
+}
+.p3d-deep {
+  perspective: 2200px;
+}
+.preserve {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(14px) rotateX(-60deg);
   }
 }

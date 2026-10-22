@@ -59,9 +59,10 @@ export default function Preloader() {
         gsap
           .timeline({ delay: wait })
           .to(progress, { v: 100, duration: 0.5, ease: "power2.inOut", onUpdate: paint })
-          .to(".pl-content", { yPercent: -40, autoAlpha: 0, duration: 0.6, ease: "power3.in" }, "+=0.15")
-          .to(root.current, { clipPath: "inset(0 0 100% 0)", duration: 1.1, ease: "expo.inOut" }, "-=0.2")
-          .add(finish, "-=0.75")
+          .to(".pl-content", { yPercent: -60, rotateX: 70, autoAlpha: 0, duration: 0.7, ease: "power3.in", transformPerspective: 800 }, "+=0.15")
+          // Three colour curtains lift one after another: wine, raspberry, rose.
+          .to(".pl-panel", { clipPath: "inset(0 0 100% 0)", duration: 1.15, ease: "expo.inOut", stagger: { each: 0.13, from: "end" } }, "-=0.25")
+          .add(finish, "-=0.8")
           .set(root.current, { display: "none" });
       });
     },
@@ -69,14 +70,12 @@ export default function Preloader() {
   );
 
   return (
-    <div
-      ref={root}
-      className="fixed inset-0 z-[95] grid place-items-center bg-cocoa-950 text-ivory-100"
-      style={{ clipPath: "inset(0 0 0% 0)" }}
-      aria-hidden
-    >
+    <div ref={root} className="fixed inset-0 z-[95] text-ivory-100" aria-hidden>
+      <div className="pl-panel absolute inset-0 bg-rose-300" style={{ clipPath: "inset(0 0 0% 0)" }} />
+      <div className="pl-panel absolute inset-0 bg-wine-500" style={{ clipPath: "inset(0 0 0% 0)" }} />
+      <div className="pl-panel absolute inset-0 grid place-items-center bg-wine-950" style={{ clipPath: "inset(0 0 0% 0)" }}>
       <div className="pl-content flex flex-col items-center gap-3">
-        <span className="label text-[10px] text-ivory-500">Benvenuti da</span>
+        <span className="label text-[10px] text-rose-300">Benvenuti da</span>
         <Logo className="text-[clamp(30px,3vw,40px)]" />
       </div>
       <div className="pl-content absolute bottom-[56px] left-1/2 flex -translate-x-1/2 items-center gap-6">
@@ -86,6 +85,7 @@ export default function Preloader() {
         <span ref={count} className="w-8 font-display text-[13px] font-semibold tabular-nums">
           0
         </span>
+      </div>
       </div>
     </div>
   );

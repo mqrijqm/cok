@@ -1,109 +1,96 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import Image from "next/image";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
-import { TypeOnScroll } from "./Reveal";
-import { COLLECTION_INTRO, EDITIONS, paintings, type Edition } from "@/lib/content";
+import { EDITIONS, paintings } from "@/lib/content";
 import { prefersReducedMotion } from "@/lib/motion";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
-// Scattered two-column layout: width, aspect, offsets, where the detail inset pops up.
-const LAYOUT = [
-  { wrap: "lg:w-[40%]", aspect: "aspect-[4/5]", inset: "left-[46%] top-[34%]" },
-  { wrap: "lg:w-[30%] lg:mt-[24vh]", aspect: "aspect-[4/5]", inset: "-left-[14%] top-[44%]" },
-  { wrap: "lg:w-[30%] lg:ml-[8%]", aspect: "aspect-[4/5]", inset: "left-[52%] top-[18%]" },
-  { wrap: "lg:w-[46%] lg:mt-[14vh]", aspect: "aspect-[4/3]", inset: "left-[8%] top-[40%]" },
-  { wrap: "lg:w-[38%]", aspect: "aspect-[4/5]", inset: "left-[44%] top-[46%]" },
-];
+const STEP = 360 / EDITIONS.length;
 
-function EditionCard({ e, i }: { e: Edition; i: number }) {
-  const L = LAYOUT[i];
-  const img = paintings[e.image];
-  return (
-    <a href="#abbonamento" data-cursor="View" className={`ed-card group relative block w-full ${L.wrap}`}>
-      <div className={`relative ${L.aspect}`}>
-        <div className="absolute inset-0 overflow-hidden rounded-[24px] bg-cocoa-900">
-          <div className="ed-par absolute inset-[-8%_0]">
-            <Image
-              src={img}
-              alt={`${e.name}: Renaissance portrait with Avorio white chocolate`}
-              fill
-              sizes="(min-width: 1024px) 46vw, 100vw"
-              placeholder="blur"
-              className="object-cover transition-transform duration-[1.4s] ease-[var(--ease-out-expo)] group-hover:scale-[1.05]"
-              style={{ objectPosition: e.focus }}
-            />
-          </div>
-          <div className="absolute inset-0 bg-gradient-to-t from-cocoa-950/60 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
-          <div className="absolute inset-x-4 bottom-4 flex flex-wrap justify-center gap-1.5 text-ivory-100 opacity-0 transition-all duration-500 group-hover:opacity-100 [@media(hover:none)]:opacity-100">
-            {e.tags.map((t) => (
-              <span key={t} className="chip bg-cocoa-950/35">
-                {t}
-              </span>
-            ))}
-          </div>
-        </div>
-
-        {/* Detail inset: a close-up of the chocolate, like the reference's preview clip */}
-        <div
-          className={`pointer-events-none absolute z-10 hidden aspect-[16/10] w-[46%] translate-y-4 overflow-hidden rounded-[18px] opacity-0 shadow-[0_24px_50px_-12px_rgb(0_0_0/0.6)] ring-1 ring-ivory-100/20 transition-all duration-700 ease-[var(--ease-out-expo)] group-hover:translate-y-0 group-hover:opacity-100 lg:block ${L.inset}`}
-        >
-          <Image
-            src={img}
-            alt=""
-            fill
-            sizes="24vw"
-            className="scale-[2.4] object-cover"
-            style={{ objectPosition: e.detail, transformOrigin: e.detail }}
-          />
-        </div>
-      </div>
-      <h3 className="mt-4 font-display text-[clamp(22px,2.1vw,30px)] font-bold uppercase leading-none tracking-[-0.04em] text-ivory-100">{e.name}</h3>
-      <p className="label mt-2 text-[10px] text-ivory-100/45">{e.meta}</p>
-    </a>
-  );
-}
-
+/** The five editions on a ring that turns as you scroll. */
 export default function Collection() {
   const root = useRef<HTMLElement>(null);
+  const [front, setFront] = useState(0);
 
   useGSAP(
     () => {
-      if (prefersReducedMotion()) return;
-      gsap.utils.toArray<HTMLElement>(".ed-card").forEach((card) => {
-        gsap.from(card, { y: 80, autoAlpha: 0, duration: 1.2, ease: "expo.out", scrollTrigger: { trigger: card, start: "top 88%", once: true } });
-        gsap.fromTo(
-          card.querySelector(".ed-par"),
-          { yPercent: -5 },
-          { yPercent: 5, ease: "none", scrollTrigger: { trigger: card, start: "top bottom", end: "bottom top", scrub: true } }
-        );
+      const ring = root.current!.querySelector<HTMLElement>(".col-ring")!;
+      const tilt = root.current!.querySelector<HTMLElement>(".ring-tilt")!;
+      const turns = (EDITIONS.length - 1) * STEP;
+      if (prefersReducedMotion()) {
+        gsap.set(tilt, { rotateX: -8 });
+        return;
+      }
+      const tl = gsap.timeline({
+        scrollTrigger: {
+          trigger: root.current,
+          start: "top top",
+          end: "+=320%",
+          pin: true,
+          scrub: 0.8,
+          onUpdate: (self) => {
+            const angle = Math.max(0, (self.progress - 0.12) / 0.8) * turns;
+            setFront(Math.min(EDITIONS.length - 1, Math.round(angle / STEP)));
+          },
+        },
       });
+      // Arrive tilted and far, then turn through every edition.
+      tl.fromTo(tilt, { rotateX: -38, scale: 0.6 }, { rotateX: -8, scale: 1, ease: "power2.out", duration: 0.12 })
+        .fromTo(ring, { rotateY: 40 }, { rotateY: 0, ease: "power2.out", duration: 0.12 }, 0)
+        .to(ring, { rotateY: -turns, ease: "none", duration: 0.8 })
+        .to(tilt, { rotateX: 12, scale: 0.9, ease: "power1.in", duration: 0.08 });
+      tl.fromTo(".col-title", { yPercent: 30, opacity: 0 }, { yPercent: 0, opacity: 1, duration: 0.12, ease: "power2.out" }, 0);
     },
     { scope: root }
   );
 
-  return (
-    <section ref={root} id="collezione" data-nav="dark" className="relative bg-cocoa-950 px-[var(--gutter)] pb-[clamp(90px,11vw,170px)] pt-[clamp(90px,12vw,180px)]">
-      <TypeOnScroll
-        strong={COLLECTION_INTRO.strong}
-        soft={COLLECTION_INTRO.soft}
-        className="mx-auto max-w-[880px] text-center font-display text-[clamp(30px,3.4vw,50px)] font-medium leading-[1.06] tracking-[-0.05em] text-ivory-100"
-        softClassName="text-ivory-100/40"
-      />
+  const e = EDITIONS[front];
 
-      <div className="mt-[clamp(70px,9vw,140px)] flex flex-col gap-16 lg:flex-row lg:flex-wrap lg:justify-between lg:gap-x-0 lg:gap-y-[clamp(80px,9vw,140px)]">
-        {EDITIONS.map((e, i) => (
-          <EditionCard key={e.name} e={e} i={i} />
-        ))}
-        <div className="flex items-center justify-center lg:w-[46%]">
-          <a href="#abbonamento" className="btn btn-ghost btn-sm text-ivory-100">
-            View all editions
-          </a>
+  return (
+    <section ref={root} id="collezione" data-nav="light" className="relative z-10 h-[100svh] overflow-hidden bg-ivory-100 text-wine-900">
+      <div className="col-title pointer-events-none absolute inset-x-0 top-[13svh] text-center">
+        <p className="serif text-[clamp(40px,5vw,90px)] leading-none text-wine-500">la</p>
+        <h2 className="display -mt-[0.1em] text-[17.5vw] font-medium leading-[0.8]">Collezione</h2>
+      </div>
+
+      <div className="p3d-deep absolute inset-0 grid place-items-center pt-[10svh]">
+        <div className="ring-tilt preserve">
+        <div
+          className="col-ring preserve relative [--r:calc(var(--w)*1.05)] [--w:min(56vw,300px)] md:[--r:calc(var(--w)*1.3)] md:[--w:clamp(200px,20vw,340px)]"
+          style={{ width: "var(--w)", height: "calc(var(--w) * 1.3)" }}
+        >
+          {EDITIONS.map((ed, i) => (
+            <div
+              key={ed.name}
+              className="preserve absolute inset-0"
+              style={{ transform: `rotateY(${i * STEP}deg) translateZ(var(--r))` }}
+              data-cursor="Taste"
+            >
+              <div className="backface-hidden absolute inset-0 overflow-hidden rounded-[20px] shadow-[0_40px_80px_-30px_rgb(63_21_33/0.6)] ring-1 ring-wine-900/10">
+                <Image src={paintings[ed.image]} alt={`${ed.name}, ${ed.notes}`} fill sizes="340px" placeholder="blur" className="object-cover" style={{ objectPosition: ed.focus }} />
+                <span className="label absolute left-3 top-3 rounded-full bg-ivory-100/85 px-2.5 py-1 text-[9px] text-wine-900 backdrop-blur">{ed.meta}</span>
+              </div>
+              <div className="backface-hidden absolute inset-0 grid place-items-center rounded-[20px] bg-wine-700 text-rose-100" style={{ transform: "rotateY(180deg)" }}>
+                <span className="serif px-4 text-center text-[clamp(34px,3.4vw,58px)] leading-[0.9]">{ed.name}</span>
+              </div>
+            </div>
+          ))}
         </div>
+        </div>
+      </div>
+
+      <div className="pointer-events-none absolute inset-x-0 bottom-8 text-center">
+        <p key={e.name} className="display animate-[fade-up_0.7s_var(--ease-out-expo)] text-[clamp(30px,3.6vw,56px)] font-medium leading-none">
+          {e.name}
+        </p>
+        <p className="label mt-3 text-[10px] text-wine-500">
+          {e.meta} · {e.notes}
+        </p>
       </div>
     </section>
   );

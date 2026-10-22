@@ -5,6 +5,15 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  // Three.js scenes are imperative: useFrame mutates materials, matrices and
+  // refs every frame by design. The React Compiler purity rules don't apply.
+  {
+    files: ["src/components/three/**"],
+    rules: {
+      "react-hooks/immutability": "off",
+      "react-hooks/refs": "off",
+    },
+  },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
