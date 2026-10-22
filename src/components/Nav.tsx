@@ -55,14 +55,10 @@ export default function Nav() {
     <>
       <header className="fixed inset-x-0 top-0 z-50 px-[var(--gutter)] pt-3">
         <nav
-          className={`mx-auto flex items-center justify-between rounded-[14px] border transition-all duration-700 ease-[var(--ease-out-expo)] ${
+          className={`mx-auto flex items-center justify-between rounded-[14px] border-[1.5px] transition-[height,padding,background-color,color,border-color] duration-500 ease-[var(--ease-out-expo)] ${
             scrolled
-              ? `h-[52px] px-3 pl-4 backdrop-blur-xl ${
-                  light
-                    ? "border-wine-900/10 bg-ivory-100/70 text-wine-900 shadow-[0_10px_40px_-12px_rgb(63_21_33/0.3)]"
-                    : "border-ivory-100/10 bg-wine-900/55 text-ivory-100 shadow-[0_10px_40px_-12px_rgb(0_0_0/0.5)]"
-                }`
-              : "h-[80px] border-transparent bg-transparent px-0 text-ivory-100"
+              ? `h-[52px] px-3 pl-4 ${light ? "border-magenta bg-beige text-magenta" : "border-beige bg-magenta text-beige"}`
+              : "h-[80px] border-transparent bg-transparent px-0 text-beige"
           }`}
         >
           <a href="#top" onClick={go("#top")} className={`transition-[font-size] duration-700 ${scrolled ? "text-[15px]" : "text-[19px]"}`}>
@@ -72,7 +68,7 @@ export default function Nav() {
           <ul className={`absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 lg:flex ${scrolled ? "text-[13px]" : "text-[15px]"} font-medium transition-[font-size] duration-700`}>
             {NAV.map((item) => (
               <li key={item.label}>
-                <a href={item.href} onClick={go(item.href)} className="block rounded-[8px] px-3.5 py-2 transition-colors hover:bg-current/10">
+                <a href={item.href} onClick={go(item.href)} className="link-under mx-3.5 block py-2">
                   {item.label}
                 </a>
               </li>
@@ -80,7 +76,7 @@ export default function Nav() {
           </ul>
 
           <div className="flex items-center gap-3">
-            <a href="#contatto" onClick={go("#contatto")} className={`btn ${scrolled ? "btn-sm" : ""}`}>
+            <a href="#contatto" onClick={go("#contatto")} className={`btn ${light ? "btn-dark" : ""} ${scrolled ? "btn-sm" : ""}`}>
               Order
             </a>
             <button
@@ -88,7 +84,7 @@ export default function Nav() {
               aria-label={open ? "Close menu" : "Open menu"}
               aria-expanded={open}
               onClick={() => setOpen((o) => !o)}
-              className={`grid h-10 w-10 place-items-center rounded-[10px] lg:hidden ${light ? "bg-wine-900/8" : "bg-ivory-100/10"}`}
+              className="grid h-10 w-10 place-items-center rounded-[10px] border-[1.5px] border-current lg:hidden"
             >
               <span className="relative block h-3 w-4">
                 <span className={`absolute left-0 h-px w-4 bg-current transition-all duration-500 ${open ? "top-1.5 rotate-45" : "top-0"}`} />
@@ -102,19 +98,19 @@ export default function Nav() {
 
       <div
         ref={menuRef}
-        className="p3d fixed inset-0 z-40 hidden flex-col justify-end bg-wine-900 px-[var(--gutter)] pb-10 pt-28 lg:hidden"
+        className="p3d fixed inset-0 z-40 hidden flex-col justify-end bg-magenta px-[var(--gutter)] pb-10 pt-28 lg:hidden"
         style={{ clipPath: "inset(0 0 100% 0)" }}
       >
         <ul className="flex flex-col gap-1">
           {NAV.map((item) => (
             <li key={item.label} className="line-mask">
-              <a href={item.href} onClick={go(item.href)} className="mm-link display block origin-bottom text-[15vw] text-ivory-100">
+              <a href={item.href} onClick={go(item.href)} className="mm-link display block origin-bottom text-[15vw] text-beige">
                 {item.label}
               </a>
             </li>
           ))}
         </ul>
-        <p className="label mt-10 text-rose-300">Firenze · Cioccolato bianco</p>
+        <p className="label mt-10 text-beige">Firenze · Cioccolato bianco</p>
       </div>
     </>
   );

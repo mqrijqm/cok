@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
-import { Figtree, Instrument_Serif, JetBrains_Mono, Space_Grotesk } from "next/font/google";
+import { Instrument_Serif, Space_Grotesk } from "next/font/google";
+import localFont from "next/font/local";
 import SmoothScroll from "@/components/SmoothScroll";
 import Cursor from "@/components/Cursor";
 import "./globals.css";
@@ -17,15 +18,14 @@ const instrumentSerif = Instrument_Serif({
   style: ["normal", "italic"],
 });
 
-const figtree = Figtree({
-  variable: "--font-figtree",
-  subsets: ["latin"],
-});
-
-const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin"],
-  weight: ["400", "500"],
+// Small descriptive type
+const pragmatica = localFont({
+  variable: "--font-pragmatica",
+  src: [
+    { path: "../fonts/PragmaticaExtended-Book.otf", weight: "400", style: "normal" },
+    { path: "../fonts/PragmaticaExtended-Bold.otf", weight: "700", style: "normal" },
+  ],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -35,19 +35,15 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#3f1521",
+  themeColor: "#6a0c6f",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html
-      lang="en"
-      className={`${spaceGrotesk.variable} ${instrumentSerif.variable} ${figtree.variable} ${jetbrainsMono.variable} antialiased`}
-    >
+    <html lang="en" className={`${spaceGrotesk.variable} ${instrumentSerif.variable} ${pragmatica.variable} antialiased`}>
       <body>
         <SmoothScroll>{children}</SmoothScroll>
         <Cursor />
-        <div className="grain" aria-hidden />
       </body>
     </html>
   );

@@ -1,55 +1,30 @@
 "use client";
 
 import * as THREE from "three";
-import { RoundedBox } from "@react-three/drei";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { Edges } from "@react-three/drei";
 
-export type ChocoMats = { smooth: THREE.MeshPhysicalMaterial; faceted: THREE.MeshPhysicalMaterial };
+export const MAGENTA = "#6a0c6f";
+export const BEIGE = "#f1e7d6";
 
-export const IVORY = "#f1e3c6";
-export const RASPBERRY = "#efc3cc";
+/* ───────────── geometry: sharp edges so the outlines read like a drawing ───────────── */
 
-export function makeChocoMats(tint: string = IVORY): ChocoMats {
-  const base: THREE.MeshPhysicalMaterialParameters = {
-    color: new THREE.Color(tint),
-    roughness: 0.36,
-    sheen: 0.8,
-    sheenRoughness: 0.5,
-    sheenColor: new THREE.Color("#fff8ee"),
-    clearcoat: 0.25,
-    clearcoatRoughness: 0.6,
-  };
-  return {
-    smooth: new THREE.MeshPhysicalMaterial(base),
-    faceted: new THREE.MeshPhysicalMaterial({ ...base, flatShading: true }),
-  };
+function squareParts(x = 0, z = 0) {
+  const slab = new THREE.BoxGeometry(0.96, 0.2, 0.96).translate(x, 0, z);
+  // A 4-sided cylinder is a square frustum: the bevelled plateau of a chocolate square.
+  const top = new THREE.CylinderGeometry(0.29 * Math.SQRT2, 0.43 * Math.SQRT2, 0.14, 4, 1).rotateY(Math.PI / 4).translate(x, 0.17, z);
+  return [slab, top];
 }
 
-// A 4-sided cylinder is a square frustum: the bevelled plateau of a chocolate square.
-const frustum = new THREE.CylinderGeometry(0.29 * Math.SQRT2, 0.43 * Math.SQRT2, 0.14, 4, 1);
-
-/** One pillowed square, centred on its slab. */
-export function Square({ mats, position }: { mats: ChocoMats; position?: [number, number, number] }) {
-  return (
-    <group position={position}>
-      <RoundedBox args={[0.96, 0.2, 0.96]} radius={0.04} smoothness={3} material={mats.smooth} />
-      <mesh position={[0, 0.17, 0]} rotation={[0, Math.PI / 4, 0]} material={mats.faceted} geometry={frustum} />
-    </group>
-  );
-}
-
-/** A block of cols × rows squares joined by a thin base, so the grooves read. */
-export function Block({ mats, cols = 2, rows = 2 }: { mats: ChocoMats; cols?: number; rows?: number }) {
-  const squares: [number, number, number][] = [];
+/** cols × rows squares on a thin base, merged into one geometry. Top faces +Y. */
+export function makeBlockGeometry(cols = 1, rows = 1) {
+  const parts: THREE.BufferGeometry[] = [];
   for (let c = 0; c < cols; c++)
-    for (let r = 0; r < rows; r++) squares.push([(c - (cols - 1) / 2) * 1.0, 0, (r - (rows - 1) / 2) * 1.0]);
-  return (
-    <group>
-      <RoundedBox args={[cols - 0.02, 0.1, rows - 0.02]} radius={0.04} smoothness={3} position={[0, -0.07, 0]} material={mats.smooth} />
-      {squares.map((p) => (
-        <Square key={p.join()} mats={mats} position={p} />
-      ))}
-    </group>
-  );
+    for (let r = 0; r < rows; r++) parts.push(...squareParts((c - (cols - 1) / 2) * 1.0, (r - (rows - 1) / 2) * 1.0));
+  if (cols * rows > 1) parts.push(new THREE.BoxGeometry(cols - 0.02, 0.1, rows - 0.02).translate(0, -0.07, 0));
+  const merged = mergeGeometries(parts.map((g) => g.toNonIndexed()));
+  parts.forEach((g) => g.dispose());
+  return merged;
 }
 
 export function seeded(seed: number) {
@@ -57,7 +32,7 @@ export function seeded(seed: number) {
   return () => (s = (s * 16807) % 2147483647) / 2147483647;
 }
 
-/** A broken shard: square base with a jagged top-right edge, extruded with a soft bevel. */
+/** A broken shard: square base with a jagged top-right edge, extruded flat. */
 export function makeShardGeometry(seed: number) {
   const r = seeded(seed + 0.137);
   const pts: [number, number][] = [
@@ -75,18 +50,32 @@ export function makeShardGeometry(seed: number) {
   shape.moveTo(pts[0][0], pts[0][1]);
   pts.slice(1).forEach(([x, y]) => shape.lineTo(x, y));
   shape.closePath();
-  const g = new THREE.ExtrudeGeometry(shape, {
-    depth: 0.16,
-    bevelEnabled: true,
-    bevelThickness: 0.05,
-    bevelSize: 0.045,
-    bevelSegments: 3,
-    curveSegments: 1,
-  });
+  const g = new THREE.ExtrudeGeometry(shape, { depth: 0.22, bevelEnabled: false });
   g.center();
-  g.computeVertexNormals();
   return g;
 }
+
+/** Flat fill + outline in the other colour. No lights, no shading. */
+export function FlatPiece({
+  geometry,
+  fill = BEIGE,
+  line = MAGENTA,
+  lineWidth = 2,
+}: {
+  geometry: THREE.BufferGeometry;
+  fill?: string;
+  line?: string;
+  lineWidth?: number;
+}) {
+  return (
+    <mesh geometry={geometry}>
+      <meshBasicMaterial color={fill} toneMapped={false} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
+      <Edges threshold={15} lineWidth={lineWidth} color={line} toneMapped={false} />
+    </mesh>
+  );
+}
+
+/* ───────────── easing helpers ───────────── */
 
 export const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 export const smooth = (x: number) => x * x * (3 - 2 * x);
@@ -104,16 +93,5 @@ if (typeof window !== "undefined") {
       windowPointer.y = -((e.clientY / window.innerHeight) * 2 - 1);
     },
     { passive: true }
-  );
-}
-
-export function StudioLights({ rim = "#e3a7b6" }: { rim?: string }) {
-  return (
-    <>
-      <hemisphereLight args={["#fff4e8", "#3f1521", 0.55]} />
-      <directionalLight position={[3, 6, 5]} intensity={2.4} color="#fff1dc" />
-      <directionalLight position={[-4, 1, 3]} intensity={0.6} color="#ffe6c4" />
-      <pointLight position={[-4, 1.5, -2.5]} intensity={30} color={rim} />
-    </>
   );
 }

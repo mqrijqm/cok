@@ -26,8 +26,21 @@ export default function FlyingLayer() {
   const webgl = useWebGL();
 
   useGSAP(() => {
-    ScrollTrigger.create({ start: 0, endTrigger: "#story", end: "bottom top", onToggle: (s) => setInHero(s.isActive) });
-    ScrollTrigger.create({ trigger: "#contatto", start: "top bottom", end: "bottom top", onToggle: (s) => setInFooter(s.isActive) });
+    // start: -1 so the very top counts as "inside"; onRefresh re-syncs after jumps or a restored scroll position.
+    ScrollTrigger.create({
+      start: -1,
+      endTrigger: "#story",
+      end: "bottom top",
+      onToggle: (s) => setInHero(s.isActive),
+      onRefresh: (s) => setInHero(s.isActive),
+    });
+    ScrollTrigger.create({
+      trigger: "#contatto",
+      start: "top bottom",
+      end: "bottom top",
+      onToggle: (s) => setInFooter(s.isActive),
+      onRefresh: (s) => setInFooter(s.isActive),
+    });
   });
 
   useIntro(() => {

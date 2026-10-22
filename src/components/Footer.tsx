@@ -51,49 +51,49 @@ export default function Footer() {
   };
 
   return (
-    <footer ref={root} id="contatto" data-nav="dark" className="relative z-10 overflow-hidden bg-wine-950">
-      <div className="ft-inner flex min-h-[100svh] flex-col bg-wine-900 px-[var(--gutter)] pb-6 pt-[16vh] text-ivory-100">
+    <footer ref={root} id="contatto" data-nav="dark" className="relative z-10 overflow-hidden bg-beige">
+      <div className="ft-inner flex min-h-[100svh] flex-col bg-magenta px-[var(--gutter)] pb-6 pt-[16vh] text-beige">
         <div className="ft-title p3d text-center">
-          <p className="serif text-[clamp(56px,9vw,170px)] leading-[0.8] text-rose-300">{FOOTER.serif}</p>
-          <h2 className="display mt-[-0.04em] text-[clamp(96px,19vw,360px)] font-medium leading-[0.8]" aria-label={FOOTER.giant}>
+          <p className="serif text-[clamp(56px,9vw,170px)] leading-[0.8]">{FOOTER.serif}</p>
+          <h2 className="display mt-[-0.04em] text-[clamp(96px,19vw,360px)] leading-[0.8]" aria-label={FOOTER.giant}>
             {[...FOOTER.giant].map((ch, i) => (
               <span key={i} className="ft-taste inline-block" aria-hidden>
                 {ch}
               </span>
             ))}
           </h2>
-          <p className="mx-auto mt-8 max-w-[420px] text-[16px] leading-[1.55] text-ivory-100/75">{FOOTER.body}</p>
+          <p className="mx-auto mt-8 max-w-[440px] text-[14px] leading-[1.6]">{FOOTER.body}</p>
           <div className="mt-7 flex flex-wrap items-center justify-center gap-3">
             <a href={`mailto:${CONTACT.email}?subject=Tasting`} className="btn font-bold">
               {FOOTER.cta} <span aria-hidden>→</span>
             </a>
-            <a href={`mailto:${CONTACT.email}`} className="btn btn-ghost btn-sm text-ivory-100">
+            <a href={`mailto:${CONTACT.email}`} className="btn btn-ghost btn-sm text-beige">
               {CONTACT.email}
             </a>
           </div>
         </div>
 
-        <ul className="label mt-auto flex flex-wrap justify-center gap-x-8 gap-y-3 pt-20 text-[10px] text-ivory-100/70">
+        <ul className="label mt-auto flex flex-wrap justify-center gap-x-8 gap-y-3 pt-20">
           {NAV.map((n) => (
             <li key={n.label}>
-              <a href={n.href} onClick={go(n.href)} className="transition-colors hover:text-rose-300">
+              <a href={n.href} onClick={go(n.href)} className="link-under">
                 {n.label}
               </a>
             </li>
           ))}
           <li>
-            <a href={CONTACT.instagram} className="transition-colors hover:text-rose-300">
+            <a href={CONTACT.instagram} className="link-under">
               Instagram
             </a>
           </li>
           <li>
-            <a href={CONTACT.pinterest} className="transition-colors hover:text-rose-300">
+            <a href={CONTACT.pinterest} className="link-under">
               Pinterest
             </a>
           </li>
         </ul>
 
-        <p className="ft-wordmark p3d display mt-6 whitespace-nowrap text-center text-[25vw] font-medium leading-[0.78] tracking-[-0.075em] text-rose-300" aria-label={FOOTER.wordmark}>
+        <p className="ft-wordmark p3d display mt-6 whitespace-nowrap text-center text-[25vw] leading-[0.78] tracking-[-0.075em]" aria-label={FOOTER.wordmark}>
           {[...FOOTER.wordmark].map((ch, i) => (
             <span key={i} className="ft-letter inline-block" aria-hidden>
               {ch}
@@ -101,13 +101,13 @@ export default function Footer() {
           ))}
         </p>
 
-        <div className="mt-6 flex flex-col gap-3 text-[12px] text-ivory-100/50 sm:flex-row sm:justify-between">
+        <div className="label mt-6 flex flex-col gap-3 sm:flex-row sm:justify-between">
           <span>© 2026 Avorio · Firenze</span>
           <span className="flex gap-6">
-            <a href="#" className="hover:text-ivory-100">
+            <a href="#" className="link-under">
               Privacy
             </a>
-            <a href="#" className="hover:text-ivory-100">
+            <a href="#" className="link-under">
               Terms
             </a>
           </span>

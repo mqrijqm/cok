@@ -59,7 +59,7 @@ export default function Cursor() {
         @media (hover: hover) and (pointer: fine) {
           a, button, [role=tab], [data-cursor] { cursor: none; }
         }
-        .cursor-ring.is-hover > span { scale: 1.9; background: rgb(209 132 154 / 0.15); }
+        .cursor-ring.is-hover > span { scale: 1.9; }
       `}</style>
       <div
         ref={ring}
@@ -67,12 +67,12 @@ export default function Cursor() {
         className="cursor-ring pointer-events-none fixed left-0 top-0 z-[100] opacity-0"
       >
         <span
-          className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border border-rose-400 transition-[width,height,scale,background-color] duration-500 ease-[var(--ease-out-expo)] ${
-            label !== null ? "h-24 w-24 bg-rose-400" : "h-9 w-9"
+          className={`absolute grid -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border-2 border-magenta outline outline-[1.5px] outline-beige transition-[width,height,scale,background-color] duration-500 ease-[var(--ease-out-expo)] ${
+            label !== null ? "h-24 w-24 bg-magenta" : "h-9 w-9"
           }`}
         >
           <span
-            className={`label text-[10px] text-wine-900 transition-opacity duration-300 ${label ? "opacity-100" : "opacity-0"}`}
+            className={`label text-[10px] text-beige transition-opacity duration-300 ${label ? "opacity-100" : "opacity-0"}`}
           >
             {label}
           </span>
@@ -80,7 +80,7 @@ export default function Cursor() {
       </div>
       <div ref={dot} aria-hidden className="pointer-events-none fixed left-0 top-0 z-[100] opacity-0">
         <span
-          className={`absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-rose-400 transition-opacity ${
+          className={`absolute h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-magenta outline outline-[1.5px] outline-beige transition-opacity ${
             label !== null ? "opacity-0" : "opacity-100"
           }`}
         />

@@ -25,85 +25,33 @@ export const HERO = {
   giant: "Bianco",
   body: "Only the butter of the cacao bean, Bourbon vanilla and slow milk. Tempered by hand, in small batches.",
   cta: "Watch it being made",
-  facts: ["38% cocoa butter", "0% cocoa solids", "Melts at 34°"],
+  facts: ["Cocoa butter", "Bourbon vanilla", "Slow milk"],
 };
 
-// The one text section: each line gets its own background colour.
+export const M = "#6a0c6f";
+export const B = "#f1e7d6";
+
+// The one text section. Lines alternate beige / magenta with hard edges;
 // `em` is the word set in italic serif.
 export const STORY = [
-  { pre: "White chocolate is", em: "chocolate", post: "without the dark.", bg: "#3f1521", fg: "#f4ecde", accent: "#e3a7b6" },
-  { pre: "Only the bean's", em: "butter,", post: "pressed pale and perfumed.", bg: "#6e2337", fg: "#f4ecde", accent: "#f5dce1" },
-  { pre: "Folded with milk, Bourbon", em: "vanilla", post: "and a whisper of sugar.", bg: "#a23b5a", fg: "#faf6ee", accent: "#3f1521" },
-  { pre: "It melts at", em: "34°,", post: "just below your tongue.", bg: "#e3a7b6", fg: "#3f1521", accent: "#faf6ee" },
-];
-
-export const STATS = [
-  { value: 38, unit: "%", label: "Cocoa butter. The law asks for 20." },
-  { value: 0, unit: "%", label: "Cocoa solids. That is why it is white." },
-  { value: 72, unit: "h", label: "Rest before every bar is cut." },
+  { pre: "White chocolate is", em: "chocolate", post: "without the dark.", bg: B, fg: M },
+  { pre: "Only the bean's", em: "butter,", post: "pressed pale and perfumed.", bg: M, fg: B },
+  { pre: "Folded with milk, Bourbon", em: "vanilla", post: "and a whisper of sugar.", bg: B, fg: M },
+  { pre: "It melts", em: "slowly,", post: "just below your tongue.", bg: M, fg: B },
 ];
 
 export const TRANSITION_WORDS = ["Dal", "seme", "alla", "tavoletta."];
 
-// Seven acts, from the tree to the bar. Colours run dark wine → ivory,
-// the same way the bean becomes white chocolate.
+// Seven acts, one big word and one short line each.
+// Backgrounds alternate magenta / beige, starting on magenta.
 export const MAKING = [
-  {
-    n: "01",
-    it: "Raccolta",
-    en: "The harvest",
-    body: "Cacao pods grow straight from the trunk. When they turn gold and amber, each one is cut by hand so the tree is never hurt.",
-    fact: "Theobroma cacao · 20° from the equator",
-    bg: "#1f0a10",
-  },
-  {
-    n: "02",
-    it: "Apertura",
-    en: "Opening the pod",
-    body: "One clean crack. Inside, thirty to fifty beans sleep in a sweet white pulp that tastes like lychee.",
-    fact: "30–50 beans per pod",
-    bg: "#3f1521",
-  },
-  {
-    n: "03",
-    it: "Fermento",
-    en: "Ferment & dry",
-    body: "Three to six days under banana leaves turn the pulp to warmth and the beans to flavour. Then they dry slowly in the sun.",
-    fact: "3–6 days · sun-dried",
-    bg: "#561c2d",
-  },
-  {
-    n: "04",
-    it: "Tostatura",
-    en: "Roast & crack",
-    body: "A gentle roast opens the aroma. The shells crack away and what is left are nibs: pure, bitter, alive.",
-    fact: "Roasted · cracked · winnowed",
-    bg: "#6e2337",
-  },
-  {
-    n: "05",
-    it: "Pressatura",
-    en: "The press",
-    body: "Ground and pressed, the nibs give up their butter, pale gold and fragrant. The dark stays behind. White chocolate keeps only this.",
-    fact: "Cocoa butter · 38% of every bar",
-    bg: "#a23b5a",
-  },
-  {
-    n: "06",
-    it: "Concaggio",
-    en: "Milk, vanilla, time",
-    body: "The butter is folded with milk, split Bourbon vanilla and a little sugar, then kneaded for hours until it turns silk.",
-    fact: "Conched for 36 hours",
-    bg: "#e3a7b6",
-  },
-  {
-    n: "07",
-    it: "Tempera",
-    en: "Temper & mould",
-    body: "Cooled, warmed, cooled again on marble until the crystals line up. Poured, rested for three days. Then it snaps.",
-    fact: "28° · 72 h · one clean snap",
-    bg: "#f4ecde",
-  },
+  { it: "Raccolta", line: "Cut by hand from the trunk." },
+  { it: "Apertura", line: "Beans asleep in sweet pulp." },
+  { it: "Fermento", line: "Days under banana leaves." },
+  { it: "Tostatura", line: "Roasted, cracked, alive." },
+  { it: "Pressatura", line: "Only the butter stays." },
+  { it: "Concaggio", line: "Milk, vanilla, patience." },
+  { it: "Tempera", line: "And then it snaps." },
 ];
 
 export type Edition = {

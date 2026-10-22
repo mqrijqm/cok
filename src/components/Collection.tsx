@@ -52,9 +52,9 @@ export default function Collection() {
   const e = EDITIONS[front];
 
   return (
-    <section ref={root} id="collezione" data-nav="light" className="relative z-10 h-[100svh] overflow-hidden bg-ivory-100 text-wine-900">
+    <section ref={root} id="collezione" data-nav="light" className="relative z-10 h-[100svh] overflow-hidden bg-beige text-magenta">
       <div className="col-title pointer-events-none absolute inset-x-0 top-[13svh] text-center">
-        <p className="serif text-[clamp(40px,5vw,90px)] leading-none text-wine-500">la</p>
+        <p className="serif text-[clamp(40px,5vw,90px)] leading-none">la</p>
         <h2 className="display -mt-[0.1em] text-[17.5vw] font-medium leading-[0.8]">Collezione</h2>
       </div>
 
@@ -71,11 +71,11 @@ export default function Collection() {
               style={{ transform: `rotateY(${i * STEP}deg) translateZ(var(--r))` }}
               data-cursor="Taste"
             >
-              <div className="backface-hidden absolute inset-0 overflow-hidden rounded-[20px] shadow-[0_40px_80px_-30px_rgb(63_21_33/0.6)] ring-1 ring-wine-900/10">
+              <div className="backface-hidden absolute inset-0 overflow-hidden rounded-[20px] ring-2 ring-magenta">
                 <Image src={paintings[ed.image]} alt={`${ed.name}, ${ed.notes}`} fill sizes="340px" placeholder="blur" className="object-cover" style={{ objectPosition: ed.focus }} />
-                <span className="label absolute left-3 top-3 rounded-full bg-ivory-100/85 px-2.5 py-1 text-[9px] text-wine-900 backdrop-blur">{ed.meta}</span>
+                <span className="label absolute left-3 top-3 rounded-full bg-beige px-2.5 py-1.5 text-[9px] text-magenta">{ed.meta}</span>
               </div>
-              <div className="backface-hidden absolute inset-0 grid place-items-center rounded-[20px] bg-wine-700 text-rose-100" style={{ transform: "rotateY(180deg)" }}>
+              <div className="backface-hidden absolute inset-0 grid place-items-center rounded-[20px] bg-magenta text-beige" style={{ transform: "rotateY(180deg)" }}>
                 <span className="serif px-4 text-center text-[clamp(34px,3.4vw,58px)] leading-[0.9]">{ed.name}</span>
               </div>
             </div>
@@ -85,10 +85,10 @@ export default function Collection() {
       </div>
 
       <div className="pointer-events-none absolute inset-x-0 bottom-8 text-center">
-        <p key={e.name} className="display animate-[fade-up_0.7s_var(--ease-out-expo)] text-[clamp(30px,3.6vw,56px)] font-medium leading-none">
+        <p key={e.name} className="display origin-bottom animate-[flip-up_0.7s_var(--ease-out-expo)] text-[clamp(30px,3.6vw,56px)] leading-none">
           {e.name}
         </p>
-        <p className="label mt-3 text-[10px] text-wine-500">
+        <p className="label mt-3">
           {e.meta} · {e.notes}
         </p>
       </div>

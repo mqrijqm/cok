@@ -70,19 +70,19 @@ export default function Preloader() {
   );
 
   return (
-    <div ref={root} className="fixed inset-0 z-[95] text-ivory-100" aria-hidden>
-      <div className="pl-panel absolute inset-0 bg-rose-300" style={{ clipPath: "inset(0 0 0% 0)" }} />
-      <div className="pl-panel absolute inset-0 bg-wine-500" style={{ clipPath: "inset(0 0 0% 0)" }} />
-      <div className="pl-panel absolute inset-0 grid place-items-center bg-wine-950" style={{ clipPath: "inset(0 0 0% 0)" }}>
+    <div ref={root} className="fixed inset-0 z-[95] text-beige" aria-hidden>
+      <div className="pl-panel absolute inset-0 bg-magenta" style={{ clipPath: "inset(0 0 0% 0)" }} />
+      <div className="pl-panel absolute inset-0 bg-beige" style={{ clipPath: "inset(0 0 0% 0)" }} />
+      <div className="pl-panel absolute inset-0 grid place-items-center bg-magenta" style={{ clipPath: "inset(0 0 0% 0)" }}>
       <div className="pl-content flex flex-col items-center gap-3">
-        <span className="label text-[10px] text-rose-300">Benvenuti da</span>
+        <span className="label">Benvenuti da</span>
         <Logo className="text-[clamp(30px,3vw,40px)]" />
       </div>
       <div className="pl-content absolute bottom-[56px] left-1/2 flex -translate-x-1/2 items-center gap-6">
-        <span className="relative block h-px w-[240px] bg-ivory-100/15">
-          <span ref={bar} className="absolute inset-0 origin-left bg-ivory-100" style={{ transform: "scaleX(0)" }} />
+        <span className="relative block h-[5px] w-[240px] rounded-full border-[1.5px] border-beige">
+          <span ref={bar} className="absolute inset-0 origin-left bg-beige" style={{ transform: "scaleX(0)" }} />
         </span>
-        <span ref={count} className="w-8 font-display text-[13px] font-semibold tabular-nums">
+        <span ref={count} className="label w-8 tabular-nums">
           0
         </span>
       </div>

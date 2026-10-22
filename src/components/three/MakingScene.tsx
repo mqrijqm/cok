@@ -3,484 +3,661 @@
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, Lightformer } from "@react-three/drei";
-import { Square, StudioLights, makeChocoMats, seeded, seg, lerp } from "./chocolate";
+import { Edges } from "@react-three/drei";
+import { SVGLoader } from "three/examples/jsm/loaders/SVGLoader.js";
+import { mergeGeometries } from "three/examples/jsm/utils/BufferGeometryUtils.js";
+import { makeBlockGeometry, seeded, seg, lerp, windowPointer, BEIGE, MAGENTA } from "./chocolate";
 import { makingState } from "@/lib/scrollState";
 
-/* ───────────── timeline ─────────────
-   Seven acts across p ∈ [0,1]. S = one act. */
+/* ───────────── timeline: seven acts across p ∈ [0,1] ───────────── */
 const S = 1 / 7;
-const A = (i: number, f = 0) => (i + f) * S; // start of act i, plus a fraction of an act
+const A = (i: number, f = 0) => (i + f) * S;
 
-/* ───────────── geometry builders ───────────── */
-
-function podProfile() {
-  const pts: THREE.Vector2[] = [];
-  const N = 30;
-  const L = 1.15;
-  for (let i = 0; i <= N; i++) {
-    const t = i / N;
-    let r = Math.pow(Math.sin(Math.PI * t), 0.72) * 0.6;
-    r *= 1 - 0.3 * Math.max(0, (t - 0.68) / 0.32); // pointed tip
-    pts.push(new THREE.Vector2(Math.max(r, 0.002), -L + 2 * L * t));
-  }
-  return pts;
-}
-
-/** Ridged cacao pod (or one half of it). Long axis = local Y. */
-function makePod(phiStart = 0, phiLength = Math.PI * 2) {
-  const g = new THREE.LatheGeometry(podProfile(), 56, phiStart, phiLength);
-  const pos = g.attributes.position;
-  const v = new THREE.Vector3();
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i);
-    const phi = Math.atan2(v.x, v.z);
-    const r = Math.hypot(v.x, v.z);
-    const k = 1 + 0.075 * Math.cos(phi * 10) * Math.min(1, r / 0.25);
-    pos.setXYZ(i, v.x * k, v.y, v.z * k);
-  }
-  g.computeVertexNormals();
-  return g;
-}
-
-function makeLeaf() {
-  const s = new THREE.Shape();
-  s.moveTo(0, 0);
-  s.bezierCurveTo(0.42, 0.35, 0.4, 1.15, 0, 1.75);
-  s.bezierCurveTo(-0.4, 1.15, -0.42, 0.35, 0, 0);
-  return new THREE.ShapeGeometry(s, 16);
-}
-
-function makeSpiralTexture() {
-  const c = document.createElement("canvas");
-  c.width = c.height = 512;
-  const ctx = c.getContext("2d")!;
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(0, 0, 512, 512);
-  ctx.strokeStyle = "rgba(140,96,52,0.09)";
-  ctx.lineWidth = 5;
-  for (let arm = 0; arm < 3; arm++) {
-    ctx.beginPath();
-    for (let a = 0; a < 26; a += 0.04) {
-      const r = a * 9.5;
-      ctx.lineTo(256 + Math.cos(a + arm * 2.09) * r, 256 + Math.sin(a + arm * 2.09) * r);
-    }
-    ctx.stroke();
-  }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
-/* ───────────── colours ───────────── */
-
-const C = {
-  podGreen: new THREE.Color("#6f8f3a"),
-  podGold: new THREE.Color("#e3a13a"),
-  podAmber: new THREE.Color("#c7612a"),
-  pulp: new THREE.Color("#f2ece3"),
-  ferment: new THREE.Color("#8a4a45"),
-  dried: new THREE.Color("#6b3a28"),
-  roasted: new THREE.Color("#3f2117"),
-  butter: new THREE.Color("#eed592"),
-  ivory: new THREE.Color("#f3e6cc"),
+/* ───────────── two-colour material ─────────────
+   Every shape is either INK (the opposite of the background) or PAPER
+   (the same as the background). The background wipes from the top between
+   magenta and beige; this shader flips each pixel on the same line, so
+   illustrations invert exactly where the wipe passes. No lighting at all. */
+const U = {
+  uM: { value: new THREE.Color(MAGENTA) },
+  uB: { value: new THREE.Color(BEIGE) },
+  uWipe: { value: 0 },
+  uFromM: { value: 1 },
+  uToM: { value: 1 },
+  uRes: { value: new THREE.Vector2(1, 1) },
 };
 
-const tmp = new THREE.Color();
-const mix3 = (a: THREE.Color, b: THREE.Color, c: THREE.Color, t: number) =>
-  t < 0.5 ? tmp.copy(a).lerp(b, t * 2) : tmp.copy(b).lerp(c, (t - 0.5) * 2);
+const VERT = /* glsl */ `
+void main() {
+  vec4 p = vec4(position, 1.0);
+  #ifdef USE_INSTANCING
+  p = instanceMatrix * p;
+  #endif
+  gl_Position = projectionMatrix * modelViewMatrix * p;
+}`;
 
-/* ───────────── camera path, one key per act boundary ───────────── */
+const FRAG = /* glsl */ `
+uniform vec3 uM;
+uniform vec3 uB;
+uniform float uWipe;
+uniform float uFromM;
+uniform float uToM;
+uniform vec2 uRes;
+uniform float uRole;
+void main() {
+  float y = gl_FragCoord.y / uRes.y;
+  float isNew = step(1.0 - uWipe, y);
+  float bgIsM = mix(uFromM, uToM, isNew);
+  float isM = mix(bgIsM, 1.0 - bgIsM, uRole);
+  gl_FragColor = vec4(mix(uB, uM, isM), 1.0);
+  #include <colorspace_fragment>
+}`;
 
-const CAM: [number, number, number, number, number, number][] = [
-  // pos x,y,z        look x,y,z
-  [-0.5, 0.7, 6.2, -0.5, 0.35, 0],
-  [0, 0.8, 6.4, 0, 0, 0],
-  [0, 3.4, 6.6, 0, -0.8, 0],
-  [0, 2.9, 6.0, 0, -0.8, 0],
-  [0, 1.7, 6.8, 0, -0.45, 0],
-  [0, 3.8, 5.6, 0, -0.9, 0],
-  [0, 0.9, 7.2, 0, -0.1, 0],
-  [0, 0.7, 6.6, 0, 0.05, 0],
-];
+const INK = 1;
+const PAPER = 0;
+const flat = (role: number) =>
+  new THREE.ShaderMaterial({ uniforms: { ...U, uRole: { value: role } }, vertexShader: VERT, fragmentShader: FRAG, side: THREE.DoubleSide });
+
+/* ───────────── vector drawing helpers ───────────── */
+
+type P = [number, number];
+const strokeStyle = (w: number) => SVGLoader.getStrokeStyle(w, "#000", "round", "round", 4);
+const strokeGeo = (pts: P[], w: number) => SVGLoader.pointsToStroke(pts.map(([x, y]) => new THREE.Vector2(x, y)), strokeStyle(w));
+const strokes = (paths: P[][], w = 0.035, z = 0.004) => mergeGeometries(paths.map((p) => strokeGeo(p, w))).translate(0, 0, z);
+const fill = (pts: P[]) => new THREE.ShapeGeometry(new THREE.Shape(pts.map(([x, y]) => new THREE.Vector2(x, y))), 1);
+const range = (n: number, f: (t: number) => P): P[] => Array.from({ length: n + 1 }, (_, i) => f(i / n));
+const closed = (pts: P[]): P[] => [...pts, pts[0]];
+
+/** Cacao pod outline: half-width at height y. */
+const podW = 0.62;
+const podH = 1.15;
+const halfWidth = (y: number) => podW * Math.pow(Math.max(0, 1 - (y / podH) ** 2), 0.75) * (1 - 0.12 * (y / podH));
+
+function podHalf(side: -1 | 1) {
+  const edge = range(40, (t) => {
+    const y = -podH + 2 * podH * t;
+    return [side * halfWidth(y), y];
+  });
+  const shape = fill([...edge, [0, podH], [0, -podH]]);
+  const ridges = [0.36, 0.7].map((f) =>
+    range(30, (t) => {
+      const y = -0.86 * podH + 1.72 * podH * t;
+      return [side * f * halfWidth(y), y] as P;
+    })
+  );
+  return { shape, ridges: strokes(ridges, 0.032) };
+}
+
+function leafPoints(len = 1.75, wid = 0.42): P[] {
+  const s = new THREE.Shape();
+  s.moveTo(0, 0);
+  s.bezierCurveTo(wid, len * 0.2, wid * 0.95, len * 0.66, 0, len);
+  s.bezierCurveTo(-wid * 0.95, len * 0.66, -wid, len * 0.2, 0, 0);
+  return s.getPoints(18).map((v) => [v.x, v.y]);
+}
+function leafVeins(len = 1.75, wid = 0.42): P[][] {
+  const v: P[][] = [
+    [
+      [0, 0.05],
+      [0, len * 0.94],
+    ],
+  ];
+  for (const f of [0.28, 0.48, 0.68]) {
+    v.push([
+      [0, len * f],
+      [wid * 0.62, len * (f + 0.12)],
+    ]);
+    v.push([
+      [0, len * f],
+      [-wid * 0.62, len * (f + 0.12)],
+    ]);
+  }
+  return v;
+}
+
+const ellipse = (rx: number, ry: number, n = 28): P[] => range(n, (t) => [Math.cos(t * Math.PI * 2) * rx, Math.sin(t * Math.PI * 2) * ry]);
+const roundRect = (w: number, h: number, r: number): P[] => {
+  const pts: P[] = [];
+  const corners: [number, number, number][] = [
+    [w / 2 - r, h / 2 - r, 0],
+    [-w / 2 + r, h / 2 - r, Math.PI / 2],
+    [-w / 2 + r, -h / 2 + r, Math.PI],
+    [w / 2 - r, -h / 2 + r, Math.PI * 1.5],
+  ];
+  corners.forEach(([cx, cy, a0]) => {
+    for (let i = 0; i <= 6; i++) {
+      const a = a0 + (i / 6) * (Math.PI / 2);
+      pts.push([cx + Math.cos(a) * r, cy + Math.sin(a) * r]);
+    }
+  });
+  return pts;
+};
+const drop = (w: number, h: number): P[] => {
+  const s = new THREE.Shape();
+  s.moveTo(0, h * 0.6);
+  s.bezierCurveTo(w * 0.55, 0, w * 0.6, -h * 0.4, 0, -h * 0.4);
+  s.bezierCurveTo(-w * 0.6, -h * 0.4, -w * 0.55, 0, 0, h * 0.6);
+  return s.getPoints(16).map((v) => [v.x, v.y]);
+};
+const flame = (w: number, h: number): P[] => {
+  const s = new THREE.Shape();
+  s.moveTo(0, h);
+  s.bezierCurveTo(w * 0.2, h * 0.6, w * 0.75, h * 0.35, w * 0.45, 0);
+  s.bezierCurveTo(w * 0.3, -h * 0.15, -w * 0.3, -h * 0.15, -w * 0.45, 0);
+  s.bezierCurveTo(-w * 0.75, h * 0.35, -w * 0.15, h * 0.55, 0, h);
+  return s.getPoints(16).map((v) => [v.x, v.y]);
+};
+
+/** The bar as a line drawing, matching the 3D bar seen straight on. */
+function barDrawing(cols = 3, rows = 4) {
+  const paths: P[][] = [];
+  const sq = (h: number, cx: number, cy: number): P[] =>
+    closed([
+      [cx - h, cy - h],
+      [cx + h, cy - h],
+      [cx + h, cy + h],
+      [cx - h, cy + h],
+    ]);
+  paths.push(sq(1, 0, 0).map(([x, y]) => [(x * (cols - 0.02)) / 2, (y * (rows - 0.02)) / 2] as P));
+  for (let r = rows - 1; r >= 0; r--)
+    for (let c = 0; c < cols; c++) {
+      const cx = (c - (cols - 1) / 2) * 1.0;
+      const cy = (r - (rows - 1) / 2) * 1.0;
+      paths.push(sq(0.48, cx, cy), sq(0.43, cx, cy), sq(0.29, cx, cy));
+      for (const [sx, sy] of [
+        [1, 1],
+        [-1, 1],
+        [-1, -1],
+        [1, -1],
+      ])
+        paths.push([
+          [cx + sx * 0.43, cy + sy * 0.43],
+          [cx + sx * 0.29, cy + sy * 0.29],
+        ]);
+    }
+  return strokes(paths, 0.03, 0.02);
+}
 
 /* ───────────── the scene ───────────── */
 
-const BEANS = 35;
+const BEANS = 24;
 const NIBS_PER = 3;
-const DROPS = 12;
-const SUGAR = 10;
+const DROPS = 8;
+const SUGAR = 8;
 
 function Process({ reduced }: { reduced: boolean }) {
-  const { camera, size } = useThree();
+  const { camera, size, gl } = useThree();
   const pd = useRef(0);
 
-  const rnd = useMemo(() => seeded(0.77), []);
+  const mats = useMemo(() => ({ ink: flat(INK), paper: flat(PAPER), barLines: flat(INK) }), []);
+
+  const geo = useMemo(() => {
+    const L = podHalf(-1);
+    const R = podHalf(1);
+    const bigLeafPts = leafPoints(3.4, 1.05);
+    return {
+      podL: L.shape,
+      podLRidges: L.ridges,
+      podR: R.shape,
+      podRRidges: R.ridges,
+      podSeam: strokes([range(20, (t) => [0, -0.9 * podH + 1.8 * podH * t])], 0.03),
+      trunk: fill(roundRect(0.6, 6.4, 0.28).map(([x, y]) => [x, y + 1.25] as P)),
+      bark: strokes([-0.14, 0.02, 0.15].map((x, i) => range(40, (t) => [x + Math.sin(t * 18 + i) * 0.03, -1.7 + 6.1 * t]))),
+      leaf: fill(leafPoints()),
+      leafVeins: strokes(leafVeins(), 0.03),
+      stem: strokes(
+        [
+          [
+            [-1.05, 1.32],
+            [-0.82, 1.42],
+            [-0.6, 1.38],
+          ],
+        ],
+        0.06
+      ),
+      cut: strokes(
+        [
+          [
+            [-0.4, 0],
+            [0.4, 0],
+          ],
+        ],
+        0.05
+      ),
+      bean: fill(ellipse(0.105, 0.16)),
+      beanSeam: strokes([range(10, (t) => [Math.sin(t * Math.PI) * 0.02, -0.12 + 0.24 * t])], 0.022),
+      bigLeaf: strokes([closed(bigLeafPts), ...leafVeins(3.4, 1.05)], 0.045),
+      sun: strokes(
+        [
+          ellipse(0.32, 0.32, 40),
+          ...Array.from({ length: 10 }, (_, i): P[] => {
+            const a = (i / 10) * Math.PI * 2;
+            return [
+              [Math.cos(a) * 0.48, Math.sin(a) * 0.48],
+              [Math.cos(a) * 0.72, Math.sin(a) * 0.72],
+            ];
+          }),
+        ],
+        0.05
+      ),
+      pan: strokes([ellipse(1.45, 1.45, 64), ellipse(1.3, 1.3, 64), closed(roundRect(0.9, 0.22, 0.1).map(([x, y]) => [x + 1.95, y] as P))], 0.05),
+      flame: fill(flame(0.38, 0.62)),
+      nib: fill([
+        [0, 0.07],
+        [0.065, -0.05],
+        [-0.06, -0.04],
+      ]),
+      press: fill(roundRect(2.1, 0.62, 0.08)),
+      pressLines: strokes(
+        [
+          [
+            [-0.9, 0.08],
+            [0.9, 0.08],
+          ],
+          [
+            [-0.9, -0.12],
+            [0.9, -0.12],
+          ],
+        ],
+        0.035,
+        0.01
+      ),
+      screw: fill(roundRect(0.22, 3.2, 0.06).map(([x, y]) => [x, y + 1.9] as P)),
+      drop: fill(drop(0.3, 0.42)),
+      pool: new THREE.CircleGeometry(1, 64),
+      spiral: strokes(
+        [0, 1, 2].map((arm) =>
+          range(80, (t) => {
+            const a = t * 9 + arm * 2.09;
+            const r = 0.08 + t * 0.82;
+            return [Math.cos(a) * r, Math.sin(a) * r];
+          })
+        ),
+        0.04,
+        0.01
+      ),
+      cube: fill(
+        closed([
+          [-0.08, -0.08],
+          [0.08, -0.08],
+          [0.08, 0.08],
+          [-0.08, 0.08],
+        ])
+      ),
+      vanilla: fill(roundRect(0.09, 1.6, 0.045)),
+      barLines: barDrawing(),
+      barFill: new THREE.PlaneGeometry(2.98, 3.98).translate(0, -1.99, 0),
+      bar3d: makeBlockGeometry(3, 4).rotateX(Math.PI / 2),
+    };
+  }, []);
+
+  const rnd = useMemo(() => seeded(0.31), []);
   const data = useMemo(() => {
-    // Beans inside the pod (pod-local) and scattered on the leaf (world)
-    const inPod: THREE.Vector3[] = [];
-    const tray: THREE.Vector3[] = [];
-    const trayRot: number[] = [];
-    for (let i = 0; i < BEANS; i++) {
-      const row = Math.floor(i / 5);
-      const a = (i % 5) * ((Math.PI * 2) / 5) + row * 0.63;
-      inPod.push(new THREE.Vector3(Math.sin(a) * 0.27, -0.82 + row * 0.27, Math.cos(a) * 0.27));
-      const rr = Math.sqrt(rnd()) * 1.45;
-      const ta = rnd() * Math.PI * 2;
-      tray.push(new THREE.Vector3(Math.cos(ta) * rr * 1.1, -0.88, Math.sin(ta) * rr * 0.75));
-      trayRot.push(rnd() * Math.PI);
-    }
-    const nibOff: THREE.Vector3[] = [];
-    const pile: THREE.Vector3[] = [];
-    for (let i = 0; i < BEANS * NIBS_PER; i++) {
-      nibOff.push(new THREE.Vector3((rnd() - 0.5) * 0.32, rnd() * 0.06, (rnd() - 0.5) * 0.32));
-      const h = Math.pow(rnd(), 1.6);
-      const pr = Math.sqrt(rnd()) * 0.85 * (1 - h);
-      const pa = rnd() * Math.PI * 2;
-      pile.push(new THREE.Vector3(Math.cos(pa) * pr, -0.86 + h * 0.95, Math.sin(pa) * pr));
-    }
-    const qTray = trayRot.map((ry) => new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2, ry, 0)));
-    const drops = Array.from({ length: DROPS }, () => ({ x: (rnd() - 0.5) * 1.8, z: (rnd() - 0.5) * 1.3, d: rnd() }));
-    const sugar = Array.from({ length: SUGAR }, () => ({ x: (rnd() - 0.5) * 1.9, z: (rnd() - 0.5) * 1.3, d: rnd(), r: rnd() * 6 }));
-    return { inPod, tray, qTray, nibOff, pile, drops, sugar };
+    const inPod: P[] = [];
+    for (let r = 0; r < 6; r++)
+      for (let c = 0; c < 4; c++) {
+        const y = -0.72 + r * 0.29;
+        inPod.push([(-0.27 + c * 0.18) * (halfWidth(y) / podW) * 1.3, y]);
+      }
+    const leafPos: P[] = inPod.map(() => {
+      const a = rnd() * Math.PI * 2;
+      const rr = Math.sqrt(rnd());
+      return [Math.cos(a) * rr * 1.05, Math.sin(a) * rr * 0.5];
+    });
+    const rotZ = inPod.map(() => rnd() * Math.PI);
+    const nibOff = Array.from({ length: BEANS * NIBS_PER }, () => [(rnd() - 0.5) * 0.3, (rnd() - 0.5) * 0.3, rnd() * 6] as [number, number, number]);
+    const pile = Array.from({ length: BEANS * NIBS_PER }, () => {
+      const h = Math.pow(rnd(), 1.4);
+      return [(rnd() - 0.5) * 1.5 * (1 - h), h * 0.75] as P;
+    });
+    const fall = Array.from({ length: DROPS + SUGAR }, () => ({ x: (rnd() - 0.5) * 1.8, d: rnd(), r: rnd() * 6 }));
+    return { inPod, leafPos, rotZ, nibOff, pile, fall };
   }, [rnd]);
 
-  const geo = useMemo(
-    () => ({
-      podA: makePod(0, Math.PI),
-      podB: makePod(Math.PI, Math.PI),
-      podFull: makePod(),
-      leaf: makeLeaf(),
-      bean: new THREE.SphereGeometry(1, 18, 12),
-      nib: new THREE.IcosahedronGeometry(0.075, 0),
-      drop: new THREE.SphereGeometry(0.09, 16, 12),
-      cube: new THREE.BoxGeometry(0.11, 0.11, 0.11),
-    }),
-    []
-  );
-
-  const mat = useMemo(
-    () => ({
-      pod: new THREE.MeshStandardMaterial({ color: C.podGreen, roughness: 0.55 }),
-      podInner: new THREE.MeshStandardMaterial({ color: "#efe3c8", roughness: 0.7, side: THREE.BackSide }),
-      smallPodA: new THREE.MeshStandardMaterial({ color: "#7e9a3f", roughness: 0.55 }),
-      smallPodB: new THREE.MeshStandardMaterial({ color: "#d9a640", roughness: 0.55 }),
-      bark: new THREE.MeshStandardMaterial({ color: "#4a2a1e", roughness: 0.95 }),
-      leaf: new THREE.MeshStandardMaterial({ color: "#3f6b36", roughness: 0.6, side: THREE.DoubleSide }),
-      leafDark: new THREE.MeshStandardMaterial({ color: "#2f5530", roughness: 0.6, side: THREE.DoubleSide }),
-      blade: new THREE.MeshStandardMaterial({ color: "#d9d4ce", metalness: 0.95, roughness: 0.22 }),
-      bean: new THREE.MeshPhysicalMaterial({ color: C.pulp, roughness: 0.32, clearcoat: 0.6, emissive: "#ff6a1f", emissiveIntensity: 0 }),
-      nib: new THREE.MeshStandardMaterial({ color: C.roasted, roughness: 0.75, flatShading: true }),
-      plate: new THREE.MeshStandardMaterial({ color: "#2a1712", roughness: 0.5, metalness: 0.4 }),
-      press: new THREE.MeshStandardMaterial({ color: "#e2dbd3", metalness: 0.55, roughness: 0.32 }),
-      pool: new THREE.MeshPhysicalMaterial({ color: C.butter, roughness: 0.14, clearcoat: 1, clearcoatRoughness: 0.15, map: makeSpiralTexture() }),
-      milk: new THREE.MeshPhysicalMaterial({ color: "#fffaf3", roughness: 0.2, clearcoat: 1 }),
-      sugar: new THREE.MeshPhysicalMaterial({ color: "#ffffff", roughness: 0.15, clearcoat: 1 }),
-      vanilla: new THREE.MeshStandardMaterial({ color: "#2b1a12", roughness: 0.6 }),
-    }),
-    []
-  );
-  const choco = useMemo(() => makeChocoMats(), []);
-
-  const r = {
+  const R = {
     root: useRef<THREE.Group>(null),
     tree: useRef<THREE.Group>(null),
+    leaves: useRef<(THREE.Group | null)[]>([]),
+    cut: useRef<THREE.Mesh>(null),
     pod: useRef<THREE.Group>(null),
-    halfA: useRef<THREE.Group>(null),
-    halfB: useRef<THREE.Group>(null),
-    blade: useRef<THREE.Mesh>(null),
+    halfL: useRef<THREE.Group>(null),
+    halfR: useRef<THREE.Group>(null),
     beans: useRef<THREE.InstancedMesh>(null),
+    seams: useRef<THREE.InstancedMesh>(null),
+    bigLeaf: useRef<THREE.Mesh>(null),
+    sun: useRef<THREE.Mesh>(null),
+    pan: useRef<THREE.Group>(null),
+    flames: useRef<(THREE.Mesh | null)[]>([]),
     nibs: useRef<THREE.InstancedMesh>(null),
-    leafTray: useRef<THREE.Mesh>(null),
-    plate: useRef<THREE.Mesh>(null),
-    press: useRef<THREE.Mesh>(null),
-    pool: useRef<THREE.Mesh>(null),
-    drops: useRef<THREE.InstancedMesh>(null),
-    sugar: useRef<THREE.InstancedMesh>(null),
+    press: useRef<THREE.Group>(null),
+    drops: useRef<(THREE.Mesh | null)[]>([]),
+    pool: useRef<THREE.Group>(null),
+    spiral: useRef<THREE.Mesh>(null),
+    falling: useRef<THREE.InstancedMesh>(null),
+    cubes: useRef<THREE.InstancedMesh>(null),
     vanilla: useRef<THREE.Mesh>(null),
-    bar: useRef<THREE.Group>(null),
-    pieces: useRef<(THREE.Group | null)[]>([]),
-    heat: useRef<THREE.PointLight>(null),
+    bar2d: useRef<THREE.Group>(null),
+    barFill: useRef<THREE.Mesh>(null),
+    bar3d: useRef<THREE.Group>(null),
   };
 
   const dummy = useMemo(() => new THREE.Object3D(), []);
   const v = useMemo(() => new THREE.Vector3(), []);
-  const v2 = useMemo(() => new THREE.Vector3(), []);
-  const look = useMemo(() => new THREE.Vector3(), []);
-  const qPod = useMemo(() => new THREE.Quaternion(), []);
 
   useFrame((state, dt) => {
-    pd.current = reduced ? makingState.p : THREE.MathUtils.damp(pd.current, makingState.p, 7, dt);
+    pd.current = reduced ? makingState.p : THREE.MathUtils.damp(pd.current, makingState.p, 8, dt);
     const p = pd.current;
-    const t = state.clock.elapsedTime;
+    const t = reduced ? 0 : state.clock.elapsedTime;
+
+    // Colour wipe, shared with the DOM through makingState.
+    U.uWipe.value = makingState.wipe;
+    U.uFromM.value = makingState.fromM;
+    U.uToM.value = makingState.toM;
+    gl.getDrawingBufferSize(U.uRes.value);
+
+    /* layout + a little pointer parallax to show the layers sit in depth */
     const portrait = size.width / size.height < 1;
-
-    /* layout: scene sits right of the text on desktop, lower on mobile */
-    const root = r.root.current!;
-    // Portrait: the text owns the top, the process plays in the lower third.
-    root.position.set(portrait ? 0 : 1.55, portrait ? -1.6 : 0, 0);
-    root.scale.setScalar(portrait ? 0.62 : 1);
+    const root = R.root.current!;
+    root.position.set(portrait ? 0 : 1.25, portrait ? 0.95 : 0.72, 0);
+    root.scale.setScalar(portrait ? 0.6 : 1);
     root.updateMatrixWorld();
+    camera.position.x = THREE.MathUtils.damp(camera.position.x, windowPointer.x * 0.35, 3, dt);
+    camera.position.y = THREE.MathUtils.damp(camera.position.y, windowPointer.y * 0.25, 3, dt);
+    camera.lookAt(0, 0, 0);
 
-    /* camera */
-    const f = Math.min(p * 7, 6.999);
-    const i = Math.floor(f);
-    const k = THREE.MathUtils.smootherstep(f - i, 0, 1);
-    const a = CAM[i];
-    const b = CAM[i + 1];
-    camera.position.set(lerp(a[0], b[0], k), lerp(a[1], b[1], k), lerp(a[2], b[2], k) * (portrait ? 1.35 : 1));
-    look.set(lerp(a[3], b[3], k), lerp(a[4], b[4], k), lerp(a[5], b[5], k));
-    camera.lookAt(look);
+    /* ── 01 Raccolta: tree, pod, a cut ── */
+    const treeOut = seg(p, A(0, 0.7), A(1, 0.05));
+    const tree = R.tree.current!;
+    tree.visible = treeOut < 1;
+    tree.position.x = -treeOut * 2.5;
+    tree.rotation.y = treeOut * (Math.PI / 2);
+    R.leaves.current.forEach((lf, i) => {
+      if (lf) lf.rotation.y = Math.sin(t * 0.9 + i * 1.7) * 0.55;
+    });
+    const cut = seg(p, A(0, 0.52), A(0, 0.64));
+    const cutM = R.cut.current!;
+    cutM.visible = cut > 0 && cut < 1;
+    cutM.scale.set(Math.sin(cut * Math.PI) * 1.4 + 0.001, 1, 1);
 
-    /* ── 01 tree & ripening ── */
-    const exitTree = seg(p, A(0, 0.75), A(1, 0.15));
-    const tree = r.tree.current!;
-    tree.visible = p < A(1, 0.2);
-    tree.position.x = -exitTree * 7;
-    tree.rotation.z = Math.sin(t * 0.6) * 0.01;
-
-    const ripen = seg(p, A(0, 0.02), A(0, 0.5));
-    mat.pod.color.copy(mix3(C.podGreen, C.podGold, C.podAmber, ripen));
-
-    const cut = seg(p, A(0, 0.5), A(0, 0.66));
-    const blade = r.blade.current!;
-    blade.visible = cut > 0 && cut < 1;
-    blade.position.set(lerp(0.9, -1.6, cut), lerp(2.4, 1.0, cut), 0.7);
-    blade.rotation.z = lerp(-0.9, -0.2, cut);
-
-    /* pod: hanging → falls to centre → opens → halves leave */
-    const fall = seg(p, A(0, 0.66), A(1, 0.02));
-    const open = seg(p, A(1, 0.15), A(1, 0.7));
-    const leave = seg(p, A(2, 0.05), A(2, 0.45));
-    const pod = r.pod.current!;
-    pod.visible = p < A(2, 0.5);
-    pod.position.set(lerp(-0.42, 0, fall), lerp(0.25, 0.05, fall) + Math.sin(fall * Math.PI) * 0.6, lerp(0.42, 0, fall));
-    pod.rotation.set(fall * 0.25, fall * Math.PI * 2 + (p > A(1) ? Math.sin(t * 0.5) * 0.05 : 0), lerp(0.18, Math.PI / 2, fall));
+    const grow = seg(p, 0, A(0, 0.45));
+    const fallIn = seg(p, A(0, 0.64), A(1, 0.05));
+    const open = seg(p, A(1, 0.15), A(1, 0.6));
+    const leave = seg(p, A(2, 0.0), A(2, 0.35));
+    const pod = R.pod.current!;
+    pod.visible = leave < 1;
+    pod.position.set(lerp(-0.6, 0, fallIn), lerp(0.25, 0, fallIn) + Math.sin(fallIn * Math.PI) * 0.7, lerp(0.25, 0.1, fallIn));
+    pod.rotation.set(0, fallIn * Math.PI * 2, lerp(0.15 + Math.sin(t * 0.8) * 0.04 * (1 - fallIn), Math.PI / 2, fallIn));
+    pod.scale.setScalar(lerp(0.8 + grow * 0.2, 1.35, fallIn));
     pod.updateMatrixWorld();
 
-    const hA = r.halfA.current!;
-    const hB = r.halfB.current!;
-    const o = open + leave * 2.5;
-    hA.position.set(o * 0.75, 0, 0);
-    hA.rotation.set(0, o * 0.85, 0);
-    hB.position.set(-o * 0.75, 0, 0);
-    hB.rotation.set(0, -o * 0.85, 0);
-    hA.scale.setScalar(1 - leave);
-    hB.scale.setScalar(1 - leave);
+    const hL = R.halfL.current!;
+    const hR = R.halfR.current!;
+    hL.position.set(-open * 0.32 - leave * 3, 0, 0);
+    hR.position.set(open * 0.32 + leave * 3, 0, 0);
+    hL.rotation.set(0, open * 1.15 + leave * 2, 0);
+    hR.rotation.set(0, -open * 1.15 - leave * 2, 0);
 
-    /* ── beans ── */
-    const toTray = seg(p, A(2, 0.02), A(2, 0.62));
-    const fermentCol = seg(p, A(2, 0.25), A(2, 0.95));
-    const roastCol = seg(p, A(3, 0.0), A(3, 0.55));
-    const bounce = seg(p, A(3, 0.05), A(3, 0.3)) * (1 - seg(p, A(3, 0.55), A(3, 0.7)));
-    const crack = seg(p, A(3, 0.62), A(3, 0.92));
-
-    if (roastCol > 0) mat.bean.color.copy(tmp.copy(C.dried).lerp(C.roasted, roastCol));
-    else mat.bean.color.copy(mix3(C.pulp, C.ferment, C.dried, fermentCol));
-    mat.bean.roughness = lerp(0.32, 0.65, fermentCol);
-    mat.bean.clearcoat = lerp(0.6, 0.05, fermentCol);
-    mat.bean.emissiveIntensity = bounce * (0.25 + Math.sin(t * 9) * 0.12);
-
-    const beans = r.beans.current!;
-    beans.visible = p > A(1, 0.05) && crack < 1;
+    /* ── beans: inside the pod → onto the leaf → roasting → crack ── */
+    const toLeaf = seg(p, A(2, 0.08), A(2, 0.5));
+    const roast = seg(p, A(3, 0.15), A(3, 0.35)) * (1 - seg(p, A(3, 0.5), A(3, 0.62)));
+    const crack = seg(p, A(3, 0.6), A(3, 0.85));
+    const beans = R.beans.current!;
+    const seams = R.seams.current!;
+    beans.visible = seams.visible = open > 0 && crack < 1;
     if (beans.visible) {
-      pod.getWorldQuaternion(qPod);
-      const pop = 0.27 + open * 0.09;
       for (let n = 0; n < BEANS; n++) {
-        const lp = data.inPod[n];
-        v.set(lp.x * (pop / 0.27), lp.y, lp.z * (pop / 0.27)).applyMatrix4(pod.matrixWorld);
-        r.root.current!.worldToLocal(v);
-        const tp = data.tray[n];
-        const arc = Math.sin(toTray * Math.PI) * (1.2 + (n % 5) * 0.1);
-        dummy.position.set(lerp(v.x, tp.x, toTray), lerp(v.y, tp.y, toTray) + arc, lerp(v.z, tp.z, toTray));
-        dummy.position.y += Math.abs(Math.sin(t * 13 + n * 1.7)) * 0.14 * bounce;
-        dummy.quaternion.slerpQuaternions(qPod, data.qTray[n], toTray);
-        const shrink = 1 - fermentCol * 0.12;
-        const s = (1 - crack) * shrink;
-        dummy.scale.set(0.12 * s, 0.19 * s, 0.085 * s);
+        const [lx, ly] = data.inPod[n];
+        v.set(lx * (1 + open * 0.15), ly, 0.03).applyMatrix4(pod.matrixWorld);
+        root.worldToLocal(v);
+        const [tx, ty] = data.leafPos[n];
+        const arc = Math.sin(toLeaf * Math.PI) * (1 + (n % 4) * 0.15);
+        dummy.position.set(lerp(v.x, tx, toLeaf), lerp(v.y, ty - 0.35, toLeaf) + arc, lerp(v.z, 0.05, toLeaf));
+        dummy.position.y += Math.abs(Math.sin(t * 12 + n * 1.3)) * 0.18 * roast;
+        dummy.rotation.set(0, toLeaf * Math.PI * 2 + roast * t * 4, lerp(Math.PI / 2, data.rotZ[n], toLeaf));
+        dummy.scale.setScalar(Math.min(1, open * 3) * (1 - crack) * (1 + Math.sin(t * 3 + n) * 0.04 * seg(p, A(2, 0.5), A(2, 0.8))));
         dummy.updateMatrix();
         beans.setMatrixAt(n, dummy.matrix);
+        dummy.position.z += 0.01;
+        dummy.updateMatrix();
+        seams.setMatrixAt(n, dummy.matrix);
       }
       beans.instanceMatrix.needsUpdate = true;
+      seams.instanceMatrix.needsUpdate = true;
     }
 
-    /* ── nibs: crack → pile → pressed → recede ── */
-    const gather = seg(p, A(4, 0.0), A(4, 0.32));
-    const squash = seg(p, A(4, 0.32), A(4, 0.55));
-    const recede = seg(p, A(4, 0.7), A(5, 0.05));
-    const nibs = r.nibs.current!;
-    nibs.visible = crack > 0 && recede < 1;
+    /* ── 03 the banana leaf unfolds; the sun turns ── */
+    const leafIn = seg(p, A(2, 0.2), A(2, 0.45));
+    const leafOut = seg(p, A(3, 0.02), A(3, 0.2));
+    const bigLeaf = R.bigLeaf.current!;
+    bigLeaf.visible = leafIn > 0 && leafOut < 1;
+    bigLeaf.rotation.set(lerp(-1.1, 0, leafIn) + leafOut * 1.1, 0, Math.PI / 2);
+    bigLeaf.scale.setScalar(Math.max(0.001, leafIn * (1 - leafOut)));
+    bigLeaf.position.set(1.7, -0.35, -0.02);
+    const sunIn = seg(p, A(2, 0.4), A(2, 0.65)) * (1 - seg(p, A(3, 0.0), A(3, 0.15)));
+    const sun = R.sun.current!;
+    sun.visible = sunIn > 0;
+    sun.scale.setScalar(sunIn + 0.001);
+    sun.position.set(1.7, 1.5 - (1 - sunIn) * 0.8, -0.1);
+    sun.rotation.z = t * 0.3;
+
+    /* ── 04 Tostatura: pan, flames, beans jump, then crack into nibs ── */
+    const panIn = seg(p, A(3, 0.0), A(3, 0.18));
+    const panUp = seg(p, A(4, 0.0), A(4, 0.2));
+    const panOut = seg(p, A(4, 0.72), A(4, 0.98));
+    const pan = R.pan.current!;
+    pan.visible = panIn > 0 && panOut < 1;
+    pan.position.set(0, -0.35 + panUp * 0.2 + panOut * 5, -0.03);
+    pan.scale.setScalar(0.9);
+    pan.rotation.set(lerp(Math.PI / 2, 0, panIn), panOut * 1.5, 0);
+    const flameAmt = seg(p, A(3, 0.12), A(3, 0.3)) * (1 - seg(p, A(3, 0.62), A(3, 0.8)));
+    R.flames.current.forEach((f, i) => {
+      if (!f) return;
+      f.visible = flameAmt > 0;
+      f.scale.set(flameAmt + 0.001, (flameAmt + 0.001) * (1 + Math.sin(t * 14 + i * 2) * 0.18), 1);
+    });
+
+    const gather = seg(p, A(4, 0.0), A(4, 0.22));
+    const squash = seg(p, A(4, 0.3), A(4, 0.45));
+    const nibs = R.nibs.current!;
+    nibs.visible = crack > 0 && panOut < 1;
     if (nibs.visible) {
       for (let n = 0; n < BEANS * NIBS_PER; n++) {
-        const bean = data.tray[Math.floor(n / NIBS_PER)];
-        const off = data.nibOff[n];
-        v.set(bean.x + off.x * crack, bean.y + 0.04 + off.y, bean.z + off.z * crack);
-        const pl = data.pile[n];
-        v2.set(pl.x * (1 + squash * 0.6), -0.86 + (pl.y + 0.86) * (1 - squash * 0.82), pl.z * (1 + squash * 0.6));
-        dummy.position.lerpVectors(v, v2, gather);
-        dummy.position.z -= recede * 2.5;
-        dummy.position.y -= recede * 0.6;
-        dummy.rotation.set(n * 1.3, n * 0.7 + crack, n * 2.1);
-        dummy.scale.setScalar(crack * (1 - recede) * (1 - squash * 0.25));
+        const [bx, by] = data.leafPos[Math.floor(n / NIBS_PER)];
+        const [ox, oy, rz] = data.nibOff[n];
+        const [px, py] = data.pile[n];
+        const sx = bx + ox * crack;
+        const sy = by - 0.35 + oy * crack;
+        dummy.position.set(
+          lerp(sx, px * (1 + squash * 0.5), gather),
+          lerp(sy, -0.35 + panUp * 0.2 + py * (1 - squash * 0.75), gather) + panOut * 5,
+          0.06
+        );
+        dummy.rotation.set(0, crack * 3 + rz, rz + crack * 2);
+        dummy.scale.setScalar(crack);
         dummy.updateMatrix();
         nibs.setMatrixAt(n, dummy.matrix);
       }
       nibs.instanceMatrix.needsUpdate = true;
     }
 
-    /* trays: banana leaf for fermenting, iron plate for roasting */
-    const leafIn = seg(p, A(2, 0.0), A(2, 0.3)) * (1 - seg(p, A(3, 0.0), A(3, 0.25)));
-    r.leafTray.current!.visible = leafIn > 0.001;
-    r.leafTray.current!.scale.set(leafIn * 4.4, leafIn * 2.05, 1);
-    const plateIn = seg(p, A(3, 0.05), A(3, 0.3)) * (1 - seg(p, A(4, 0.05), A(4, 0.3)));
-    r.plate.current!.visible = plateIn > 0.001;
-    r.plate.current!.scale.set(plateIn, 1, plateIn);
-    r.heat.current!.intensity = bounce * 28;
+    /* ── 05 Pressatura: the press comes down, butter drips into a pool ── */
+    const pressDown = seg(p, A(4, 0.12), A(4, 0.32));
+    const press = R.press.current!;
+    press.visible = pressDown > 0 && panOut < 1;
+    press.position.set(0, lerp(4, -0.15 + 0.75 * (1 - squash * 0.75) + 0.31, pressDown) + panOut * 5, 0.08);
+    press.rotation.y = panOut * -1.2;
 
-    /* press plate */
-    const down = seg(p, A(4, 0.2), A(4, 0.55));
-    const up = seg(p, A(4, 0.62), A(4, 0.9));
-    const press = r.press.current!;
-    press.visible = down > 0 && up < 1;
-    press.position.y = lerp(4.2, -0.86 + 0.95 * (1 - 0.82 * squash) + 0.14, down) + up * 4.5;
-
-    /* ── cocoa butter pool → conching → shrinks into the bar ── */
-    const spread = seg(p, A(4, 0.45), A(4, 0.95));
-    const shrinkPool = seg(p, A(6, 0.0), A(6, 0.45));
-    const pool = r.pool.current!;
-    pool.visible = spread > 0 && shrinkPool < 1;
-    const pr = Math.max(0.001, spread * 1.45 * (1 - shrinkPool) + Math.sin(t * 2) * 0.01 * spread);
-    pool.scale.set(pr, 1, pr);
-    const toIvory = seg(p, A(5, 0.2), A(5, 0.92));
-    mat.pool.color.copy(tmp.copy(C.butter).lerp(C.ivory, toIvory));
-    const swirl = seg(p, A(5, 0.0), A(5, 0.2)) * (1 - seg(p, A(5, 0.85), A(6, 0.1)));
-    pool.rotation.y += dt * (0.25 + swirl * 2.2);
-
-    /* ingredients falling in */
-    const drops = r.drops.current!;
-    drops.visible = p > A(5) && p < A(6);
-    if (drops.visible) {
-      data.drops.forEach((d, n) => {
-        const st = A(5, 0.05 + d.d * 0.45);
-        const ft = seg(p, st, st + S * 0.25);
-        dummy.position.set(d.x, lerp(3.2, -0.86, ft * ft), d.z);
-        dummy.rotation.set(0, 0, 0);
-        dummy.scale.set(1, 1 + ft * 0.4, 1).multiplyScalar(ft > 0 && ft < 0.98 ? 1 : 0);
-        dummy.updateMatrix();
-        drops.setMatrixAt(n, dummy.matrix);
-      });
-      drops.instanceMatrix.needsUpdate = true;
-    }
-    const sugar = r.sugar.current!;
-    sugar.visible = drops.visible;
-    if (sugar.visible) {
-      data.sugar.forEach((d, n) => {
-        const st = A(5, 0.15 + d.d * 0.45);
-        const ft = seg(p, st, st + S * 0.22);
-        dummy.position.set(d.x, lerp(3.2, -0.84, ft * ft), d.z);
-        dummy.rotation.set(d.r + ft * 4, d.r, d.r * 0.5);
-        dummy.scale.setScalar(ft > 0 && ft < 0.98 ? 1 : 0);
-        dummy.updateMatrix();
-        sugar.setMatrixAt(n, dummy.matrix);
-      });
-      sugar.instanceMatrix.needsUpdate = true;
-    }
-    const van = r.vanilla.current!;
-    const vt = seg(p, A(5, 0.1), A(5, 0.55));
-    const sink = seg(p, A(5, 0.55), A(5, 0.8));
-    van.visible = vt > 0 && sink < 1;
-    van.position.set(0.3, lerp(3.4, -0.84, vt) - sink * 0.1, -0.2);
-    van.rotation.set(Math.PI / 2, 0, lerp(1.2, 0.3, vt) + t * 0.1 * (1 - vt));
-    van.scale.set(1, 1, 1 - sink);
-
-    /* ── 07 the bar rises out of the pool and turns to you ── */
-    const bar = r.bar.current!;
-    const rise = seg(p, A(6, 0.08), A(6, 0.6));
-    const pose = seg(p, A(6, 0.4), A(6, 0.95));
-    bar.visible = rise > 0;
-    bar.position.set(0, lerp(-0.86, 0.05, pose), 0);
-    bar.rotation.set(lerp(0, 1.05, pose), lerp(0, -0.55, pose) + pose * Math.sin(t * 0.5) * 0.08, lerp(0, 0.12, pose));
-    r.pieces.current.forEach((pc, n) => {
-      if (!pc) return;
-      const st = seg(p, A(6, 0.08 + n * 0.022), A(6, 0.34 + n * 0.022));
-      pc.scale.set(st, Math.max(0.001, st), st);
-      pc.position.y = lerp(-0.25, 0, st);
+    R.drops.current.forEach((d, i) => {
+      if (!d) return;
+      const st = A(4, 0.38 + i * 0.1);
+      const k = seg(p, st, st + S * 0.22);
+      d.visible = k > 0 && k < 1;
+      d.position.set(-0.4 + i * 0.4, lerp(-0.3, -1.45, k * k), 0.02);
+      d.scale.setScalar(Math.min(1, k * 6) + 0.001);
     });
+
+    const poolGrow = seg(p, A(4, 0.45), A(4, 0.9));
+    const poolUp = seg(p, A(4, 0.8), A(5, 0.15));
+    const poolShrink = seg(p, A(6, 0.02), A(6, 0.25));
+    const pool = R.pool.current!;
+    pool.visible = poolGrow > 0 && poolShrink < 1;
+    const pr = poolGrow * 1.25 * (1 - poolShrink) + 0.001;
+    pool.position.set(0, lerp(-1.55, -0.1, poolUp), 0);
+    pool.scale.set(pr, pr * lerp(0.32, 1, poolUp), pr);
+    pool.rotation.x = lerp(0, -0.55, poolUp) * (1 - seg(p, A(5, 0.85), A(6, 0.05)));
+    const swirl = 0.4 + seg(p, A(5, 0.3), A(5, 0.6)) * 2.5;
+    R.spiral.current!.rotation.z -= dt * swirl * (reduced ? 0 : 1);
+
+    /* ── 06 Concaggio: milk, sugar, vanilla fall in and dissolve ── */
+    const falling = R.falling.current!;
+    const cubes = R.cubes.current!;
+    falling.visible = cubes.visible = p > A(5) && p < A(6, 0.05);
+    if (falling.visible) {
+      data.fall.forEach((f, n) => {
+        const st = A(5, 0.05 + f.d * 0.5);
+        const k = seg(p, st, st + S * 0.3);
+        dummy.position.set(f.x * (1 - k * 0.6), lerp(3.4, -0.1, k * k), 0.05);
+        dummy.rotation.set(f.r + k * 5, f.r + k * 3, f.r);
+        dummy.scale.setScalar(k > 0 && k < 0.97 ? 1 : 0);
+        dummy.updateMatrix();
+        if (n < DROPS) falling.setMatrixAt(n, dummy.matrix);
+        else cubes.setMatrixAt(n - DROPS, dummy.matrix);
+      });
+      falling.instanceMatrix.needsUpdate = true;
+      cubes.instanceMatrix.needsUpdate = true;
+    }
+    const van = R.vanilla.current!;
+    const vk = seg(p, A(5, 0.1), A(5, 0.55));
+    van.visible = vk > 0 && vk < 0.98;
+    van.position.set(0.4, lerp(3.6, 0, vk), 0.06);
+    van.rotation.set(vk * Math.PI * 2, vk * 1.5, lerp(0.9, 0.2, vk));
+
+    /* ── 07 Tempera: a line drawing, inked, then it turns into a real bar ── */
+    const draw = seg(p, A(6, 0.06), A(6, 0.42));
+    const inked = seg(p, A(6, 0.42), A(6, 0.52));
+    const to3d = seg(p, A(6, 0.55), A(6, 0.95));
+    const bar2d = R.bar2d.current!;
+    bar2d.visible = draw > 0 && to3d <= 0;
+    geo.barLines.setDrawRange(0, Math.floor(geo.barLines.attributes.position.count * draw));
+    const barFill = R.barFill.current!;
+    barFill.visible = inked > 0;
+    barFill.scale.set(1, inked + 0.001, 1);
+    mats.barLines.uniforms.uRole.value = inked >= 1 ? PAPER : INK;
+
+    const bar3d = R.bar3d.current!;
+    bar3d.visible = to3d > 0;
+    bar3d.rotation.set(lerp(0, -0.95, to3d), lerp(0, 0.6, to3d) + to3d * Math.sin(t * 0.6) * 0.06, lerp(0, -0.2, to3d));
+    bar3d.position.y = lerp(0, -0.1, to3d);
   });
 
-  // 3 × 4 bar layout
-  const barSquares: [number, number, number][] = [];
-  for (let c = 0; c < 3; c++) for (let rr = 0; rr < 4; rr++) barSquares.push([(c - 1) * 1.0, 0, (rr - 1.5) * 1.0]);
+  const leaves: { pos: [number, number, number]; rot: number; s: number }[] = [
+    { pos: [-1.25, 1.9, 0.3], rot: -0.9, s: 1.1 },
+    { pos: [-1.45, 2.3, -0.3], rot: 0.8, s: 1.2 },
+    { pos: [-1.3, 0.2, 0.35], rot: 1.9, s: 0.9 },
+    { pos: [-1.2, -0.8, -0.25], rot: -2.0, s: 0.8 },
+  ];
 
   return (
-    <group ref={r.root}>
-      {/* trunk with cauliflorous pods and leaves */}
-      <group ref={r.tree}>
-        <mesh position={[-0.98, 0.4, 0]} rotation={[0, 0, 0.05]} material={mat.bark}>
-          <cylinderGeometry args={[0.32, 0.4, 9, 24]} />
-        </mesh>
-        <mesh position={[-0.62, 1.35, 0.3]} rotation={[0, 0, -1.1]} material={mat.bark}>
-          <cylinderGeometry args={[0.035, 0.05, 0.36, 8]} />
-        </mesh>
-        <mesh geometry={geo.podFull} material={mat.smallPodA} position={[-1.35, -1.25, 0.25]} rotation={[0.2, 0, -0.35]} scale={0.55} />
-        <mesh geometry={geo.podFull} material={mat.smallPodB} position={[-0.68, -2.0, -0.3]} rotation={[-0.1, 0, 0.3]} scale={0.48} />
-        <mesh geometry={geo.leaf} material={mat.leaf} position={[-0.9, 2.1, 0.2]} rotation={[0.3, 0.4, -0.9]} scale={1.2} />
-        <mesh geometry={geo.leaf} material={mat.leafDark} position={[-1.1, 2.5, -0.2]} rotation={[-0.2, -0.5, 0.7]} scale={1.35} />
-        <mesh geometry={geo.leaf} material={mat.leaf} position={[-1.0, 1.0, -0.4]} rotation={[0.5, 1.2, 1.5]} scale={1.0} />
-        <mesh geometry={geo.leaf} material={mat.leafDark} position={[-0.8, -0.6, 0.4]} rotation={[0.2, -0.3, -1.9]} scale={0.9} />
-      </group>
-
-      <mesh ref={r.blade} material={mat.blade} visible={false}>
-        <boxGeometry args={[1.3, 0.13, 0.02]} />
-      </mesh>
-
-      {/* the pod: two halves, cream inside */}
-      <group ref={r.pod}>
-        <group ref={r.halfA}>
-          <mesh geometry={geo.podA} material={mat.pod} />
-          <mesh geometry={geo.podA} material={mat.podInner} scale={0.985} />
-        </group>
-        <group ref={r.halfB}>
-          <mesh geometry={geo.podB} material={mat.pod} />
-          <mesh geometry={geo.podB} material={mat.podInner} scale={0.985} />
-        </group>
-      </group>
-
-      <instancedMesh ref={r.beans} args={[geo.bean, mat.bean, BEANS]} frustumCulled={false} />
-      <instancedMesh ref={r.nibs} args={[geo.nib, mat.nib, BEANS * NIBS_PER]} frustumCulled={false} />
-
-      <mesh ref={r.leafTray} geometry={geo.leaf} material={mat.leaf} position={[0, -0.95, 1.78]} rotation={[-Math.PI / 2, 0, 0]} visible={false} />
-      <mesh ref={r.plate} material={mat.plate} position={[0, -0.97, 0]} visible={false}>
-        <cylinderGeometry args={[1.85, 1.85, 0.06, 64]} />
-      </mesh>
-      <pointLight ref={r.heat} position={[0, -0.4, 0.5]} color="#ff7a2a" intensity={0} distance={6} />
-
-      <mesh ref={r.press} material={mat.press} visible={false}>
-        <cylinderGeometry args={[1.05, 1.05, 0.26, 48]} />
-      </mesh>
-
-      <mesh ref={r.pool} material={mat.pool} position={[0, -0.9, 0]} visible={false}>
-        <cylinderGeometry args={[1, 1, 0.06, 64]} />
-      </mesh>
-
-      <instancedMesh ref={r.drops} args={[geo.drop, mat.milk, DROPS]} frustumCulled={false} visible={false} />
-      <instancedMesh ref={r.sugar} args={[geo.cube, mat.sugar, SUGAR]} frustumCulled={false} visible={false} />
-      <mesh ref={r.vanilla} material={mat.vanilla} visible={false}>
-        <capsuleGeometry args={[0.035, 1.5, 4, 10]} />
-      </mesh>
-
-      <group ref={r.bar} visible={false} scale={0.62}>
-        {barSquares.map((pos, n) => (
-          <group
-            key={n}
-            position={[pos[0], 0, pos[2]]}
-            ref={(el) => {
-              r.pieces.current[n] = el;
-            }}
-          >
-            <Square mats={choco} />
+    <group ref={R.root}>
+      {/* 01 the tree */}
+      <group ref={R.tree}>
+        <mesh geometry={geo.trunk} material={mats.ink} position={[-1.35, 0, -0.4]} />
+        <mesh geometry={geo.bark} material={mats.paper} position={[-1.35, 0, -0.4]} />
+        {leaves.map((l, i) => (
+          <group key={i} position={l.pos} rotation={[0, 0, l.rot]} scale={l.s}>
+            <group
+              ref={(el) => {
+                R.leaves.current[i] = el;
+              }}
+            >
+              <mesh geometry={geo.leaf} material={mats.ink} />
+              <mesh geometry={geo.leafVeins} material={mats.paper} />
+            </group>
           </group>
         ))}
+        <mesh geometry={geo.stem} material={mats.ink} position={[0, 0, -0.1]} />
+        <group position={[-0.95, -1.45, -0.2]} rotation={[0, 0, -0.3]} scale={0.5}>
+          <mesh geometry={geo.podL} material={mats.ink} />
+          <mesh geometry={geo.podR} material={mats.ink} />
+          <mesh geometry={geo.podLRidges} material={mats.paper} />
+          <mesh geometry={geo.podRRidges} material={mats.paper} />
+        </group>
+      </group>
+      <mesh ref={R.cut} geometry={geo.cut} material={mats.ink} position={[-0.8, 1.4, 0.4]} rotation={[0, 0, -0.6]} visible={false} />
+
+      {/* 01–02 the pod, two halves that swing open like doors */}
+      <group ref={R.pod}>
+        <group ref={R.halfL}>
+          <mesh geometry={geo.podL} material={mats.ink} />
+          <mesh geometry={geo.podLRidges} material={mats.paper} />
+        </group>
+        <group ref={R.halfR}>
+          <mesh geometry={geo.podR} material={mats.ink} />
+          <mesh geometry={geo.podRRidges} material={mats.paper} />
+          <mesh geometry={geo.podSeam} material={mats.paper} />
+        </group>
+      </group>
+
+      <instancedMesh ref={R.beans} args={[geo.bean, mats.ink, BEANS]} frustumCulled={false} visible={false} />
+      <instancedMesh ref={R.seams} args={[geo.beanSeam, mats.paper, BEANS]} frustumCulled={false} visible={false} />
+
+      {/* 03 */}
+      <mesh ref={R.bigLeaf} geometry={geo.bigLeaf} material={mats.ink} visible={false} />
+      <mesh ref={R.sun} geometry={geo.sun} material={mats.ink} visible={false} />
+
+      {/* 04–05 */}
+      <group ref={R.pan} visible={false}>
+        <mesh geometry={geo.pan} material={mats.ink} />
+        {[-0.55, 0, 0.55].map((x, i) => (
+          <mesh
+            key={i}
+            ref={(el) => {
+              R.flames.current[i] = el;
+            }}
+            geometry={geo.flame}
+            material={mats.ink}
+            position={[x, -1.78, 0]}
+            visible={false}
+          />
+        ))}
+      </group>
+      <instancedMesh ref={R.nibs} args={[geo.nib, mats.ink, BEANS * NIBS_PER]} frustumCulled={false} visible={false} />
+      <group ref={R.press} visible={false}>
+        <mesh geometry={geo.press} material={mats.ink} />
+        <mesh geometry={geo.pressLines} material={mats.paper} />
+        <mesh geometry={geo.screw} material={mats.ink} />
+      </group>
+      {[0, 1, 2].map((i) => (
+        <mesh
+          key={i}
+          ref={(el) => {
+            R.drops.current[i] = el;
+          }}
+          geometry={geo.drop}
+          material={mats.ink}
+          visible={false}
+        />
+      ))}
+
+      {/* 05–07 the pool of cocoa butter, then white chocolate */}
+      <group ref={R.pool} visible={false}>
+        <mesh geometry={geo.pool} material={mats.ink} />
+        <mesh ref={R.spiral} geometry={geo.spiral} material={mats.paper} />
+      </group>
+      <instancedMesh ref={R.falling} args={[geo.drop, mats.ink, DROPS]} frustumCulled={false} visible={false} />
+      <instancedMesh ref={R.cubes} args={[geo.cube, mats.ink, SUGAR]} frustumCulled={false} visible={false} />
+      <mesh ref={R.vanilla} geometry={geo.vanilla} material={mats.ink} visible={false} />
+
+      {/* 07 drawing → inked → 3D */}
+      <group ref={R.bar2d} scale={0.64} visible={false}>
+        <mesh ref={R.barFill} geometry={geo.barFill} material={mats.ink} position={[0, 1.99, 0]} visible={false} />
+        <mesh geometry={geo.barLines} material={mats.barLines} />
+      </group>
+      <group ref={R.bar3d} scale={0.64} visible={false}>
+        <mesh geometry={geo.bar3d}>
+          <meshBasicMaterial color={BEIGE} toneMapped={false} polygonOffset polygonOffsetFactor={1} polygonOffsetUnits={1} />
+          <Edges threshold={15} lineWidth={2.4} color={MAGENTA} toneMapped={false} />
+        </mesh>
       </group>
     </group>
   );
@@ -489,17 +666,12 @@ function Process({ reduced }: { reduced: boolean }) {
 export default function MakingScene({ active, reduced }: { active: boolean; reduced: boolean }) {
   return (
     <Canvas
+      flat
       dpr={[1, 1.5]}
-      camera={{ position: [0, 0.8, 6.4], fov: 35 }}
+      camera={{ position: [0, 0, 10], fov: 30 }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       frameloop={active ? "always" : "never"}
     >
-      <StudioLights />
-      <Environment resolution={128} frames={1}>
-        <Lightformer form="rect" intensity={2.6} position={[0, 5, -2]} scale={[8, 2, 1]} color="#fff6ea" />
-        <Lightformer form="rect" intensity={1} position={[0, 0, 6]} scale={[8, 3, 1]} color="#fff2e0" />
-        <Lightformer form="rect" intensity={1.4} position={[5, 0, -3]} scale={[2, 5, 1]} color="#e3a7b6" />
-      </Environment>
       <Process reduced={reduced} />
     </Canvas>
   );

@@ -9,12 +9,12 @@ import { prefersReducedMotion } from "@/lib/motion";
 
 gsap.registerPlugin(useGSAP, ScrollTrigger);
 
-// Rose → raspberry → bordeaux → the making-of's opening black-wine.
+// Beige / magenta banners; the last one is the making-of's opening magenta.
 const PANELS = [
-  { bg: "#e3a7b6", fg: "#3f1521", nav: "light" },
-  { bg: "#a23b5a", fg: "#f5dce1", nav: "dark" },
-  { bg: "#6e2337", fg: "#e3a7b6", nav: "dark" },
-  { bg: "#1f0a10", fg: "#f4ecde", nav: "dark" },
+  { bg: "#f1e7d6", fg: "#6a0c6f", nav: "light" },
+  { bg: "#6a0c6f", fg: "#f1e7d6", nav: "dark" },
+  { bg: "#f1e7d6", fg: "#6a0c6f", nav: "light" },
+  { bg: "#6a0c6f", fg: "#f1e7d6", nav: "dark" },
 ];
 
 /** Colour banners swing down on a top hinge, one after another, each carrying a word. */
@@ -43,7 +43,7 @@ export default function FlipTransition() {
   );
 
   return (
-    <section ref={root} aria-hidden className="relative z-10 h-[420svh] bg-rose-100">
+    <section ref={root} aria-hidden className="relative z-10 h-[420svh] bg-magenta">
       <div className="p3d-deep sticky top-0 h-[100svh] overflow-hidden" style={{ perspectiveOrigin: "50% 0%" }}>
         {PANELS.map((p, i) => (
           <div

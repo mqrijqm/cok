@@ -3,13 +3,12 @@
 import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Environment, Lightformer } from "@react-three/drei";
-import { Block, Square, StudioLights, makeChocoMats, makeShardGeometry, seeded, windowPointer, IVORY, RASPBERRY, type ChocoMats } from "./chocolate";
+import { FlatPiece, makeBlockGeometry, makeShardGeometry, seeded, windowPointer, BEIGE, MAGENTA } from "./chocolate";
 import { flyIntro, scrollState } from "@/lib/scrollState";
 
 type Spec = {
   kind: "square" | "block" | "shard";
-  tint: "ivory" | "rose";
+  inverted: boolean;
   x: number;
   y: number;
   z: number;
@@ -32,7 +31,7 @@ function makeSpecs(count: number, width: number): Spec[] {
     const x = r() < 0.75 ? side * (width * 0.18 + r() * width * 0.34) : (r() - 0.5) * width * 0.3;
     return {
       kind: kinds[i % kinds.length],
-      tint: r() < 0.22 ? "rose" : "ivory",
+      inverted: r() < 0.25,
       x,
       y: (r() - 0.5) * 12,
       z,
@@ -47,7 +46,7 @@ function makeSpecs(count: number, width: number): Spec[] {
   });
 }
 
-function Flyer({ spec, mats, shardGeo }: { spec: Spec; mats: ChocoMats; shardGeo: THREE.BufferGeometry }) {
+function Flyer({ spec, geometry }: { spec: Spec; geometry: THREE.BufferGeometry }) {
   const ref = useRef<THREE.Group>(null);
   const rot = useRef(new THREE.Euler(spec.phase, spec.phase * 0.7, spec.phase * 0.3));
 
@@ -66,7 +65,7 @@ function Flyer({ spec, mats, shardGeo }: { spec: Spec; mats: ChocoMats; shardGeo
     let y = spec.y + scrollState.y * 0.0028 * spec.depth + Math.sin(t * spec.bob + spec.phase) * 0.35;
     y = ((((y + span / 2) % span) + span) % span) - span / 2;
 
-    const k = THREE.MathUtils.clamp((flyIntro.t * 1.35 - spec.delay) / 1, 0, 1);
+    const k = THREE.MathUtils.clamp(flyIntro.t * 1.35 - spec.delay, 0, 1);
     const e = 1 - Math.pow(1 - k, 3);
     g.position.set(spec.x * e, y * e, spec.z * e - (1 - e) * 2);
     g.scale.setScalar(spec.scale * e);
@@ -74,13 +73,7 @@ function Flyer({ spec, mats, shardGeo }: { spec: Spec; mats: ChocoMats; shardGeo
 
   return (
     <group ref={ref}>
-      {spec.kind === "square" && <Square mats={mats} />}
-      {spec.kind === "block" && (
-        <group scale={0.62}>
-          <Block mats={mats} />
-        </group>
-      )}
-      {spec.kind === "shard" && <mesh geometry={shardGeo} material={mats.smooth} scale={1.1} />}
+      <FlatPiece geometry={geometry} fill={spec.inverted ? MAGENTA : BEIGE} line={spec.inverted ? BEIGE : MAGENTA} />
     </group>
   );
 }
@@ -89,9 +82,14 @@ function Swarm({ count }: { count: number }) {
   const group = useRef<THREE.Group>(null);
   const { viewport } = useThree();
   const specs = useMemo(() => makeSpecs(count, Math.max(viewport.width, 8)), [count, viewport.width]);
-  const ivory = useMemo(() => makeChocoMats(IVORY), []);
-  const rose = useMemo(() => makeChocoMats(RASPBERRY), []);
-  const shards = useMemo(() => [0.11, 0.53, 0.87].map(makeShardGeometry), []);
+  const geo = useMemo(
+    () => ({
+      square: makeBlockGeometry(1, 1),
+      block: makeBlockGeometry(2, 2).scale(0.62, 0.62, 0.62),
+      shards: [0.11, 0.53, 0.87].map(makeShardGeometry).map((g) => g.scale(1.1, 1.1, 1.1)),
+    }),
+    []
+  );
 
   useFrame((_, dt) => {
     const g = group.current;
@@ -103,7 +101,11 @@ function Swarm({ count }: { count: number }) {
   return (
     <group ref={group}>
       {specs.map((s, i) => (
-        <Flyer key={i} spec={s} mats={s.tint === "rose" ? rose : ivory} shardGeo={shards[Math.floor(s.shard * shards.length)]} />
+        <Flyer
+          key={i}
+          spec={s}
+          geometry={s.kind === "square" ? geo.square : s.kind === "block" ? geo.block : geo.shards[Math.floor(s.shard * geo.shards.length)]}
+        />
       ))}
     </group>
   );
@@ -112,18 +114,13 @@ function Swarm({ count }: { count: number }) {
 export default function FlyingScene({ active, count }: { active: boolean; count: number }) {
   return (
     <Canvas
+      flat
       dpr={[1, 1.5]}
       camera={{ position: [0, 0, 12], fov: 35 }}
       gl={{ antialias: true, alpha: true, powerPreference: "high-performance" }}
       frameloop={active ? "always" : "never"}
       style={{ pointerEvents: "none" }}
     >
-      <StudioLights />
-      <Environment resolution={128} frames={1}>
-        <Lightformer form="rect" intensity={2.6} position={[0, 4, -2]} scale={[8, 2, 1]} color="#fff6ea" />
-        <Lightformer form="rect" intensity={0.9} position={[0, 0, 6]} scale={[8, 3, 1]} color="#fff2e0" />
-        <Lightformer form="rect" intensity={1.6} position={[5, 0, -3]} scale={[2, 5, 1]} color="#e3a7b6" />
-      </Environment>
       <Swarm count={count} />
     </Canvas>
   );
